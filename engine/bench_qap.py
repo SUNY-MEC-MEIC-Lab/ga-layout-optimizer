@@ -110,24 +110,47 @@ def _delta_swap(perm: List[int], A: Matrix, B: Matrix, u: int, v: int) -> float:
 
 
 def solve_qap(A: Matrix, B: Matrix, iters: int = 200000, restarts: int = 5,
-              seed: int = 20260826) -> Tuple[List[int], float]:
+              seed: int = 20260826,
+              fixed: Optional[dict] = None) -> Tuple[List[int], float]:
     """
     SA + 다중 재시작. ga_core 와 같은 계열의 어닐링 스케줄·이동집합을 쓴다.
     seed 고정으로 완전 재현 가능.
+
+    fixed = {시설 index: 위치 index} — 그 시설은 그 위치에 고정되고 교환에서 빠진다
+    (예: 원자력섬 안의 RCP). 시설 수와 위치 수가 같아야 하므로, 빈 자리는
+    흐름 0 인 더미 시설로 채워 넣는다.
     """
     n = len(A)
+    fixed = dict(fixed or {})
+    if len(set(fixed.values())) != len(fixed):
+        raise ValueError("fixed: 한 위치에 두 시설을 고정할 수 없다")
+    free = [i for i in range(n) if i not in fixed]
+    free_locs = [k for k in range(n) if k not in set(fixed.values())]
+    if len(free) < 2:
+        perm = [0] * n
+        for i, k in fixed.items():
+            perm[i] = k
+        for i, k in zip(free, free_locs):
+            perm[i] = k
+        return perm, qap_cost(perm, A, B)
     rng = random.Random(seed)
     best, bestC = None, float("inf")
     for _ in range(restarts):
-        perm = list(range(n))
-        rng.shuffle(perm)
+        locs = list(free_locs)
+        rng.shuffle(locs)
+        perm = [0] * n
+        for i, k in fixed.items():
+            perm[i] = k
+        for i, k in zip(free, locs):
+            perm[i] = k
         cur = qap_cost(perm, A, B)
         lb, lbc = list(perm), cur
         T0 = max(1e-9, abs(cur) * 0.08)
         T1 = max(1e-12, T0 * 1e-5)
+        m = len(free)
         for it in range(iters):
             T = T0 * (T1 / T0) ** (it / max(1, iters - 1))
-            u, v = rng.randrange(n), rng.randrange(n)
+            u, v = free[rng.randrange(m)], free[rng.randrange(m)]
             if u == v:
                 continue
             d = _delta_swap(perm, A, B, u, v)

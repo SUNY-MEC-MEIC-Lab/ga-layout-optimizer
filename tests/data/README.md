@@ -6,15 +6,16 @@
 
 ## 1단계 — 최적성 갭
 
-### `qaplib/`
-- 출처: `coral.ise.lehigh.edu/data-sets/qaplib/`
-- 넣을 것: `<name>.dat` 과 짝이 되는 `<name>.sln`
+### `qaplib/` — **동봉됨** (12건)
+- 출처: QAPLIB, R.E. Burkard, S.E. Karisch, F. Rendl, *J. Global Optim.* 10:391–403 (1997)
+  · `coral.ise.lehigh.edu/data-sets/qaplib/` (공개 배포, 사용 제한 표기 없음)
+- 동봉: chr12a chr25a els19 esc16a had12 kra30a nug12 nug20 nug30 rou12 ste36a tai20a (.dat + .sln)
 - **최적값은 `.sln` 에서 읽는다. 코드에 하드코딩하지 않는다.**
-- 권장 소규모 인스턴스부터: `nug12`, `nug15`, `had12`, `rou12`, `esc16a`
-- `.sln` 이 없는 `.dat` 은 갭을 보고할 수 없으므로 건너뛴다.
+- 다른 인스턴스는 같은 폴더에 `.dat` 과 짝이 되는 `.sln` 을 넣으면 자동으로 포함된다.
+  `.sln` 이 없는 `.dat` 은 갭을 보고할 수 없으므로 건너뛴다.
 
 외부 데이터가 없어도 `bench_qap.py --selftest` 가 n≤8 전수탐색으로
-**진짜 최적** 을 만들어 갭을 보고한다. 이것이 최소한의 1단계 검증이다.
+**진짜 최적** 을 만들어 갭을 보고한다.
 
 ### `2dpacklib/`
 - 출처: `site.unibo.it/operations-research/en/research/2dpacklib`
@@ -22,14 +23,17 @@
 
 ## 2단계 — 재현
 
-### `wrigley2019/`
-- 출처: `data.mendeley.com/datasets/w39zbzj6bk/1` (Shearon Harris, CC BY 4.0)
-- 넣을 것: 변환된 `spec.json` + `expected.json`
+### `wrigley2019/` — **동봉됨**
+- `shearon_harris.xlsx` — Paul Wrigley, "Shearon Harris layout data", University of Derby (2018),
+  **CC BY 4.0**, `data.mendeley.com/datasets/w39zbzj6bk/1` (원본 그대로, 수정 없음)
+- 논문: Wrigley et al. (2019) *Nucl. Eng. Des.* 341:100–111, doi:10.1016/j.nucengdes.2018.10.023
+- 읽기·풀기: `engine/bench_wrigley.py` (표준 라이브러리만). RCP 고정, 20개 모듈의 **층과 자리를 모두** 배정.
+- 논문 대조용 `expected.json` 은 **비어 있다** — 기준안 좌표·기준 목적함수·두 면 배치의 모듈 묶음이
+  데이터셋에 없고 논문에만 있다. 원논문에서 옮겨 적으면 `test_wrigley2019_paper_reproduction` 이 돈다:
   ```json
-  {"baseline_objective": 14914, "pipe_reduction_pct_range": [33.9, 46.1]}
+  {"optimum": {"one_side_4F": 0, "one_side_3F": 0}, "source": "Table N, p. N"}
   ```
-- ※ 위 `baseline_objective` 14,914 는 기술조사 보고서에 없는 값이다 (−33.9~46.1% 는 보고서와 일치).
-  **expected.json 을 만들 때 원논문에서 직접 대조·확인 후 기입할 것.**
+- ※ 통용되던 "기준 목적함수 14,914" 는 출처를 확인하지 못한 값이다. 쓰지 말 것.
 
 ### `ejeh2019/`
 - Ejeh 2019 부록 B 의 요소플랜트 8기기 전체 입력데이터가 공개되어 있다.

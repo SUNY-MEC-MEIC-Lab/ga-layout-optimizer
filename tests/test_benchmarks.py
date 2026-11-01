@@ -52,13 +52,25 @@ class TestStage1Optimality(unittest.TestCase):
                                  f"{r['instance']}: 갭 {r['gap_pct']}% — "
                                  f"탐색부가 소규모 인스턴스조차 못 맞춘다")
 
+    def test_fixed_facility_matches_brute_force(self):
+        """fixed={시설: 위치} — 고정 시설은 움직이지 않고, 나머지는 조건부 최적에 도달한다."""
+        import itertools
+        A, B = bench_qap.random_instance(7, seed=3)
+        perm, c = bench_qap.solve_qap(A, B, iters=20000, restarts=3, fixed={2: 5})
+        self.assertEqual(perm[2], 5)
+        best = min(bench_qap.qap_cost(p, A, B)
+                   for p in itertools.permutations(range(7)) if p[2] == 5)
+        self.assertAlmostEqual(c, best)
+
     def test_qaplib_instances(self):
         if not _has(QAPLIB, "*.dat"):
             self.skipTest(
                 f"QAPLIB 데이터 없음. {QAPLIB} 에 .dat/.sln 을 넣을 것.\n"
                 f"  출처: coral.ise.lehigh.edu/data-sets/qaplib/\n"
                 f"  ※ 최적값은 .sln 파일에서 읽는다. 코드에 하드코딩하지 않는다.")
-        rows = bench_qap.run_dir(QAPLIB, iters=50000, restarts=3, seed=20260826)
+        # 예산은 CLI 기본값(100000×5)과 같게 둔다. 50000×3 에서는 chr25a 갭이 23.9% 로
+        # 15% 를 넘었다 — 예산이 작으면 n≥25 에서 탐색이 덜 수렴한다 (2026-11-01 확인).
+        rows = bench_qap.run_dir(QAPLIB, iters=100000, restarts=5, seed=20260826)
         self.assertTrue(rows, "「.dat 은 있는데 짝이 되는 .sln 이 없다」")
         worst = max(r["gap_pct"] for r in rows)
         print(f"\n  QAPLIB {len(rows)}건 · 최대 갭 {worst:.2f}%")
@@ -82,34 +94,57 @@ class TestStage2Reproduction(unittest.TestCase):
 
     def test_wrigley2019_shearon_harris(self):
         """
-        발표된 결과(배관길이 −33.9~46.1%)를 재현.
-        기대값은 데이터셋과 함께 넣는 expected.json 에서 읽는다 — 코드에 박지 않는다.
-        ※ 통용되는 "베이스라인 목적함수 14,914"는 기술조사 보고서에 없는 값이다.
-          expected.json 을 만들 때 원논문(Wrigley 2019)에서 직접 대조·확인할 것.
+        Shearon Harris 데이터셋(CC BY 4.0)으로 층 배정까지 포함한 자리 배정을 푼다.
+        RCP 는 원자력섬에 고정, 나머지 20개 모듈의 층·자리를 모두 결정변수로 둔다.
+        검사하는 것: 데이터를 빠짐없이 읽는가 · seed 를 바꿔도 같은 최적값에 도달하는가 ·
+        4층 격자가 3층 격자보다 나쁘지 않은가(논문도 4층이 더 좋다고 보고).
         """
-        if not _has(WRIGLEY):
+        xlsx = os.path.join(WRIGLEY, "shearon_harris.xlsx")
+        if not os.path.exists(xlsx):
             self.skipTest(
-                f"Wrigley 2019 데이터 없음. {WRIGLEY} 에 넣을 것 (CC BY 4.0).\n"
-                f"  출처: data.mendeley.com/datasets/w39zbzj6bk/1\n"
-                f"  넣을 것: 변환된 IR(spec.json) + expected.json"
-                f"{{baseline_objective, pipe_reduction_pct_range}}")
-        spec_path = os.path.join(WRIGLEY, "spec.json")
+                f"Wrigley 2019 데이터 없음. {xlsx} 에 넣을 것 (CC BY 4.0).\n"
+                f"  출처: data.mendeley.com/datasets/w39zbzj6bk/1")
+        import bench_wrigley as BW
+        data = BW.load(xlsx)
+        self.assertEqual(len(data["ids"]), 21)
+        self.assertEqual(sum(1 for r in data["W"] for v in r if v), 65,
+                         "DSM 의 모든 칸(비대칭)을 읽어야 한다")
+        self.assertEqual({g: len(v) for g, v in data["grids"].items()},
+                         {"one_side_4F": 20, "one_side_3F": 21,
+                          "two_sides_3F": 12, "two_sides_4F": 16})
+        res = {}
+        for g in ("one_side_4F", "one_side_3F"):
+            objs = {BW.solve(data, g, seed=s)["objective"]   # 기본 예산 200000×6
+                    for s in (20260826, 1)}
+            print(f"\n  Wrigley 2019 {g}: 목적함수 {sorted(objs)}")
+            self.assertEqual(len(objs), 1, f"{g}: seed 에 따라 해가 다르다 — 수렴 부족")
+            res[g] = objs.pop()
+        self.assertLessEqual(res["one_side_4F"], res["one_side_3F"])
+        with self.assertRaises(ValueError):
+            BW.instance(data, "two_sides_3F")   # 자리 12 < 모듈 20 — 지어내지 않고 멈춘다
+
+    def test_wrigley2019_paper_reproduction(self):
+        """
+        논문(−33.9~46.1%) 대조. 기준안 좌표·기준 목적함수·모듈 재묶음은 논문에만 있고
+        데이터셋에 없다. 원논문에서 옮겨 적은 expected.json 이 있을 때만 돈다.
+        """
         exp_path = os.path.join(WRIGLEY, "expected.json")
-        self.assertTrue(os.path.exists(spec_path), "spec.json 이 필요하다")
-        self.assertTrue(os.path.exists(exp_path), "expected.json 이 필요하다")
+        if not os.path.exists(exp_path):
+            self.skipTest(
+                "Wrigley 2019 논문 대조값 없음. 원논문(doi:10.1016/j.nucengdes.2018.10.023)"
+                "에서 격자별 최적 목적함수를 옮겨 적을 것:\n"
+                f"  {exp_path} = {{\"optimum\": {{\"one_side_4F\": …, \"one_side_3F\": …}}, "
+                "\"source\": \"표·쪽 번호\"}}\n"
+                "  ※ 기준 목적함수 14,914 는 출처를 확인하지 못한 값이다. 쓰지 말 것.")
+        import bench_wrigley as BW
         with open(exp_path, encoding="utf-8") as fp:
             exp = json.load(fp)
-        sp = G.load_spec(spec_path)
-        base = G.baseline(sp)
-        Fb = base.evaluate()
-        best, Fo, _ = G.optimize(sp, iters=60000, restarts=4, seed=20260826,
-                                 verbose=False)
-        red = (Fb - Fo) / Fb * 100.0
-        lo, hi = exp["pipe_reduction_pct_range"]
-        print(f"\n  Wrigley 2019: 기준 {Fb:,.0f} → 최적 {Fo:,.0f} ({red:.1f}%) "
-              f"· 발표 범위 {lo}~{hi}%")
-        self.assertGreaterEqual(red, lo * 0.5,
-                                "발표 개선폭의 절반에도 못 미친다")
+        data = BW.load(os.path.join(WRIGLEY, "shearon_harris.xlsx"))
+        for g, target in exp["optimum"].items():
+            got = BW.solve(data, g)["objective"]
+            print(f"\n  {g}: 우리 {got:,.0f} · 논문 {target:,.0f}")
+            self.assertLessEqual(got, target * 1.05,
+                                 f"{g}: 논문 최적값보다 5% 넘게 나쁘다")
 
     def test_ejeh2019_appendix_b(self):
         """
