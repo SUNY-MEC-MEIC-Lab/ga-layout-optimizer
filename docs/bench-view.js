@@ -148,7 +148,7 @@ function showPlant(i) {
   $("b-fig").innerHTML = `
     <div class="bn"><span class="lbl">논문 ${info.proven ? "· 증명된 최적" : `· 정답과 ${info.gap_pct}% 차이 남음`}</span><b>${fmt(r.published, 1)}</b><small>rmu · ${info.NF ?? "?"}층 · ${info.X ?? "?"}×${info.Y ?? "?"} m</small></div>
     <div class="bn"><span class="lbl">이 엔진 · seed ${r.n}개 중 최선</span><b>${fmt(best, 1)}</b><small>rmu · ${lay ? `${lay.NF}층 · ${lay.X}×${lay.Y} m` : ""}</small></div>
-    <div class="bn"><span class="lbl">차이 (최선 / 중앙값)</span><b class="${r.best_gap_pct < 5 ? "good" : "warn"}">+${r.best_gap_pct}%</b><small>중앙 +${r.median_gap_pct}% · 실현가능 ${r.feasible}/${r.n}</small></div>`;
+    <div class="bn"><span class="lbl">정답보다 비싼 정도 · 0% 가 정답</span><b class="${r.best_gap_pct < 5 ? "good" : "warn"}">+${r.best_gap_pct}%</b><small>최선 기준 · 중앙값 +${r.median_gap_pct}% · 실현가능 ${r.feasible}/${r.n}</small></div>`;
   $("b-note").textContent = r.demin_note || "";
   draw(view, lay);
   $("b-chart").innerHTML = sweepChart(r.plant);
@@ -158,19 +158,20 @@ function tables() {
   const ej = B.ejeh.map(r => `<tr><td>${esc(PLANT[r.plant][0])}<small>${PLANT[r.plant][1]} · 기기 ${r.layout ? r.layout.items.length : ""}개</small></td>
      <td class="n">${fmt(r.published, 1)}${r.published_info.proven ? "" : "<small>논문도 미증명</small>"}</td>
      <td class="n">${r.feasible}/${r.n}</td><td class="n"><b>+${r.best_gap_pct}%</b></td><td class="n">+${r.median_gap_pct}%</td></tr>`).join("");
-  $("b-ejeh").innerHTML = `<table class="bt"><thead><tr><th>플랜트</th><th>논문 (rmu)</th><th>실현가능</th><th>최선 차이</th><th>중앙 차이</th></tr></thead><tbody>${ej}</tbody></table>`;
+  $("b-ejeh").innerHTML = `<table class="bt"><thead><tr><th>플랜트</th><th>논문 (rmu)</th><th>실현가능</th><th>정답보다 비싼 정도 (최선)</th><th>(중앙)</th></tr></thead><tbody>${ej}</tbody></table>`;
   const q = (B.qaplib || []).slice().sort((a, b) => a.n - b.n || a.instance.localeCompare(b.instance));
   const mx = Math.max(1, ...q.map(r => r.gap_pct));
-  $("b-qap").innerHTML = `<table class="bt"><thead><tr><th>문제</th><th>크기</th><th>공개 최적</th><th>이 엔진</th><th>차이</th></tr></thead><tbody>${q.map(r =>
+  $("b-qap").innerHTML = `<table class="bt"><thead><tr><th>문제</th><th>크기</th><th>공개 최적</th><th>이 엔진</th><th>정답보다</th></tr></thead><tbody>${q.map(r =>
     `<tr><td>${esc(r.instance)}</td><td class="n">${r.n}</td><td class="n">${fmt(r.known_optimum)}</td><td class="n">${fmt(r.found)}</td>
      <td class="n"><span class="bar"><i style="width:${(r.gap_pct / mx * 100).toFixed(1)}%"></i></span>${r.gap_pct.toFixed(2)}%</td></tr>`).join("")}</tbody></table>`;
   const w = B.wrigley;
-  if (w) $("b-wr").innerHTML = `<table class="bt"><thead><tr><th>격자</th><th>자리</th><th>이 엔진</th><th>기준안 ${fmt(w.baseline)} 대비</th><th>논문</th></tr></thead><tbody>${w.rows.map(r =>
+  if (w) $("b-wr").innerHTML = `<table class="bt"><thead><tr><th>격자</th><th>자리</th><th>이 엔진</th><th>기존 배치 ${fmt(w.baseline)} 대비</th><th>논문 결과</th></tr></thead><tbody>${w.rows.map(r =>
     `<tr><td>${r.grid === "one_side_4F" ? "한 면 · 4층" : "한 면 · 3층"}</td><td class="n">${r.slots}</td><td class="n">${fmt(r.objective)}</td>
      <td class="n">−${((w.baseline - r.objective) / w.baseline * 100).toFixed(1)}%</td>
      <td class="n">${r.paper_optimum ? fmt(r.paper_optimum) + " " : ""}−${r.paper_reduction_pct}%</td></tr>`).join("")}</tbody></table>`;
 }
 
+window.__benchShow = () => { if (view) { size(view); showPlant(cur); } };
 if (B && B.ejeh && B.ejeh.length) {
   const order = ["urea", "cdu", "lng", "cogp"];
   B.ejeh.sort((a, b) => order.indexOf(a.plant) - order.indexOf(b.plant));
@@ -182,5 +183,5 @@ if (B && B.ejeh && B.ejeh.length) {
   tables();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => showPlant(cur));
 } else {
-  const s = document.getElementById("bench"); if (s) s.hidden = true;
+  const t = document.getElementById("tab-bench"); if (t) t.hidden = true;
 }

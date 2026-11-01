@@ -212,11 +212,12 @@ details.more li b{color:var(--fg);font-weight:600}
 .btab:hover{color:var(--fg)}
 .btab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--fg);font-weight:600}
 .btab[aria-selected="true"] .no{color:var(--acc)}
-.bench{border-top:1px solid var(--line);margin-top:64px;padding-top:44px}
+.bench{padding-top:28px}
 .bench-h .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--mut);font-weight:600}
 .bench-h h2{font-family:var(--serif);font-weight:600;font-size:clamp(24px,3vw,34px);margin:6px 0 10px;letter-spacing:-.01em}
 .bench-h p{max-width:760px;color:var(--mut);margin:0 0 26px;word-break:keep-all}
 .bench-h b{color:var(--fg);font-weight:600}
+.bench-h .howto{border-left:2px solid var(--acc);padding:6px 0 6px 14px;color:var(--fg)}
 .bsub{font-size:17px;margin:30px 0 12px;font-weight:600}
 .bsub small{display:block;font-weight:400;color:var(--mut2);font-size:12.5px;margin-top:2px}
 .bfig{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:14px 0 16px}
@@ -355,13 +356,12 @@ details.more li b{color:var(--fg);font-weight:600}
     <details class="viol ev" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
   </div>
 
-  </div><!-- /cases-wrap: 사례 탭은 이 안에서만 위에 붙는다 -->
-
-  <section class="bench" id="bench">
+  <section class="bench" id="bench" hidden>
     <div class="bench-h">
       <span class="eyebrow">벤치마크</span>
       <h2>정답이 알려진 문제로 검증했습니다</h2>
-      <p>위 사례들은 정답을 모릅니다. 그래서 같은 탐색 엔진을 <b>논문이 정답(전역 최적)을 공개한 문제</b>에 돌려, 정답과 얼마나 차이 나는지 쟀습니다. 문제와 비용식은 논문 그대로이고, 결과는 엔진과 별개인 검사로 실현가능한지 확인했습니다.</p>
+      <p>01–06 사례는 '가장 작은 배치' 가 무엇인지 아무도 모릅니다. 그래서 같은 탐색 엔진을 <b>논문이 정답(더 나은 배치가 없음을 증명한 최적해)을 공개한 문제</b>에 돌려, 엔진이 정답에 얼마나 가까이 가는지 쟀습니다. 문제와 비용식은 논문 그대로이고, 결과는 엔진과 별개인 검사로 실현가능한지 확인했습니다.</p>
+      <p class="howto"><b>숫자 읽는 법</b> — <b>+1.5%</b> 는 정답보다 <b>1.5% 비싼</b> 배치를 찾았다는 뜻입니다. <b>낮을수록 좋고, 0% 가 정답</b>입니다. 증명된 정답보다 싼 답은 나올 수 없으므로, '논문보다 더 줄였다' 는 뜻이 아닙니다. 공정 플랜트·QAPLIB 는 기존 도면 없이 기기 목록만 주는 <b>백지 배치</b> 문제이고, 기존 배치를 줄이는 문제는 원전 계통(Wrigley) 하나입니다.</p>
     </div>
 
     <h3 class="bsub">다층 공정 플랜트 배치 <small>Ejeh, Liu, Papageorgiou (2019), Comput. Chem. Eng. 131 · 부록 B 데이터</small></h3>
@@ -385,10 +385,12 @@ details.more li b{color:var(--fg);font-weight:600}
       <div>
         <h3 class="bsub">실제 원전 계통 배치 <small>Wrigley et al. (2019) · Shearon Harris 데이터</small></h3>
         <div id="b-wr"></div>
-        <p class="bnote">논문의 기준안(14,914)과 최적(8,036)은 공개 미리보기에서 확인했습니다. 안전계통 배치·거리 정의가 본문에만 있어 같은 문제라고 단정할 수 없습니다.</p>
+        <p class="bnote">이 문제만 <b>기존 배치를 줄이는</b> 문제입니다 — 원래 발전소 배치 14,914 를 논문은 8,036(−46.1%)으로 줄였습니다(공개 미리보기에서 확인). 이 엔진은 −54.5% 가 나왔지만, 안전계통 배치·거리 정의가 논문 본문에만 있어 같은 조건이라고 확인할 수 없으므로 "논문보다 더 줄였다" 고 말하지 않습니다.</p>
       </div>
     </div>
   </section>
+
+  </div><!-- /cases-wrap: 사례 탭은 이 안에서만 위에 붙는다 -->
 
   <footer class="note">
     <div>
@@ -891,6 +893,10 @@ function rebuild(keepView) {
 }
 
 function goto(i) {
+  if (!$("bench").hidden) {                 // 벤치마크 탭에서 사례로 돌아온다
+    $("bench").hidden = true; $("case").hidden = false;
+    show(i); frame(CASES[current]); resize(); return;
+  }
   if (i === current && $("case").dataset.ready) return;
   const el = $("case");
   const run = () => { show(i); frame(CASES[current]); resize(); el.classList.remove("swap"); el.dataset.ready = 1; };
@@ -899,8 +905,15 @@ function goto(i) {
   setTimeout(run, 200);
 }
 
-$("tabs").innerHTML = CASES.map((c, i) => `<button class="tab" role="tab" data-i="${i}" aria-selected="false"><i>${String(i + 1).padStart(2, "0")}</i>${esc(c.title)}</button>`).join("");
+$("tabs").innerHTML = CASES.map((c, i) => `<button class="tab" role="tab" data-i="${i}" aria-selected="false"><i>${String(i + 1).padStart(2, "0")}</i>${esc(c.title)}</button>`).join("") +
+  (window.GA_BENCH ? `<button class="tab" id="tab-bench" role="tab" aria-selected="false"><i>${String(CASES.length + 1).padStart(2, "0")}</i>벤치마크 — 정답이 있는 문제</button>` : "");
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => goto(+t.dataset.i));
+if ($("tab-bench")) $("tab-bench").onclick = openBench;
+function openBench() {
+  $("case").hidden = true; $("bench").hidden = false;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.id === "tab-bench")));
+  window.__benchShow && window.__benchShow();
+}
 $("c-viol").onchange = () => rebuild(true);
 $("c-model").onchange = () => rebuild(true);
 $("c-ghost").onchange = () => rebuild(true);
