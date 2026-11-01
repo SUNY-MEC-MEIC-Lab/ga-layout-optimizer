@@ -21,13 +21,18 @@ bench_wrigley.py — 2단계: Wrigley et al. 2019 Shearon Harris 데이터셋으
   쓰지 않는다). 목적함수 = Σ 연결강도 × 직교거리(|dx|+|dy|+|dz|).
   이산 배정이므로 QAP 이고, bench_qap 의 같은 SA 탐색부로 푼다.
 
-★ 논문 수치(−33.9~46.1%)와 직접 비교할 수 없는 이유 — 지어내지 않기 위해 적는다.
-  1. 기준안(원 현장조립 배치)의 좌표가 데이터셋에 없다. 기준 목적함수는 논문에만 있다.
-  2. 두 면 격자는 자리가 12·16개뿐이라 20개 모듈이 들어가지 않는다. 논문은
-     모듈 묶음(1단계)을 다시 했을 것인데, 그 묶음이 데이터셋에 없다.
-  3. RCP 의 위치(원자력섬 중심 좌표)와 거리 정의(중심 간/면 간)가 데이터셋에 없다.
-  그래서 여기서는 '자리 배정 최적해가 얼마인가' 와 '탐색이 안정적인가' 만 보고한다.
-  논문 대조는 tests/data/wrigley2019/expected.json 을 원논문에서 옮겨 적었을 때만 한다.
+논문에서 확인한 것 (ScienceDirect 논문 페이지의 공개 미리보기 — 본문 전체는 아님)
+  · 기준안(Lapp 1989 현장조립 배치, BOP 가 원자력섬 3면) 목적함수 14,914.
+  · 최선 결과 8,036 (그래픽 초록) = −46.1% → 한 면·4층. 나머지는 감소율만: 한 면 3층 −45.4%,
+    두 면 3층 −33.9%, 두 면 4층 −37.8%.
+  · "RCS 에 연결된 고정 안전계통 SIS·RHR·CS 의 연결은 목적함수에서 뺀다 (기준안에서 11,786)."
+    → exclude_rcs_safety=True (기본값) 가 RCP↔RHRCS*·SIS 칸을 0 으로 둔다.
+
+★ 그래도 논문과 같은 문제라고 말할 수 없는 이유 — 지어내지 않기 위해 적는다.
+  1. RHR·SIS 모듈이 고정인지(격자 밖) 격자 자리를 받는지 미리보기에 없다. 여기서는 격자에 둔다.
+  2. RCP 위치(원자력섬 중심 좌표)와 거리 정의(중심 간/면 간)가 데이터셋·미리보기에 없다.
+  3. 두 면 격자는 자리가 12·16개뿐이라 모듈 20개가 들어가지 않는다. 그 모듈 묶음은 본문에만 있다.
+  그래서 '같은 데이터·같은 제외 규칙에서 우리 최적값이 논문 최적값 이하인가' 만 대조한다.
 
   python3 bench_wrigley.py tests/data/wrigley2019/shearon_harris.xlsx
 """
@@ -116,9 +121,18 @@ def load(path: str) -> dict:
     return dict(ids=ids, names=names, source_floors=floors, W=W, grids=grids)
 
 
-def instance(data: dict, grid: str, rcp=RCP_POS) -> Tuple[list, list, dict, list]:
+SAFETY = ("RHRCSA", "RHRCSB", "SIS")   # 논문: RCS 에 연결된 고정 안전계통 (CS 는 RHRCS 에 포함)
+
+
+def instance(data: dict, grid: str, rcp=RCP_POS,
+             exclude_rcs_safety: bool = True) -> Tuple[list, list, dict, list]:
     """QAP 행렬. 위치 0 = RCP 자리, 1.. = 격자 자리. 남는 자리는 더미 시설."""
-    ids, W = data["ids"], data["W"]
+    ids, W = data["ids"], [row[:] for row in data["W"]]
+    if exclude_rcs_safety:
+        r = ids.index("RCP")
+        for i, nm in enumerate(data["names"]):
+            if nm in SAFETY:
+                W[r][i] = W[i][r] = 0.0
     slots = data["grids"][grid]
     nf = len(ids)
     rcp_i = ids.index("RCP")
@@ -137,8 +151,8 @@ def instance(data: dict, grid: str, rcp=RCP_POS) -> Tuple[list, list, dict, list
 
 
 def solve(data: dict, grid: str, iters: int = 200000, restarts: int = 6,
-          seed: int = 20260826) -> dict:
-    A, D, fixed, locs = instance(data, grid)
+          seed: int = 20260826, exclude_rcs_safety: bool = True) -> dict:
+    A, D, fixed, locs = instance(data, grid, exclude_rcs_safety=exclude_rcs_safety)
     perm, cost = Q.solve_qap(A, D, iters=iters, restarts=restarts, seed=seed,
                              fixed=fixed)
     ids = data["ids"]
@@ -148,6 +162,7 @@ def solve(data: dict, grid: str, iters: int = 200000, restarts: int = 6,
     moved = sum(1 for i, nm in enumerate(ids) if nm != "RCP"
                 and zs.index(place[nm]["z"]) + 1 != data["source_floors"][i])
     return dict(grid=grid, slots=len(locs) - 1, modules=len(ids), objective=cost,
+                exclude_rcs_safety=exclude_rcs_safety,
                 floors_changed=moved, placement=place, seed=seed,
                 iters=iters, restarts=restarts)
 
@@ -159,6 +174,10 @@ def main(argv=None) -> int:
     ap.add_argument("--restarts", type=int, default=6)
     ap.add_argument("--seed", type=int, default=20260826)
     ap.add_argument("--json", default=None)
+    ap.add_argument("--include-rcs-safety", action="store_true",
+                    help="RCS↔안전계통 연결도 목적함수에 넣는다 (논문과 다른 설정)")
+    ap.add_argument("--baseline", type=float, default=14914.0,
+                    help="기준안 목적함수 (논문: 14,914)")
     a = ap.parse_args(argv)
     data = load(a.xlsx)
     print(f"모듈 {len(data['ids'])}개 · 연결 칸 "
@@ -167,12 +186,15 @@ def main(argv=None) -> int:
     rows = []
     for g in GRIDS:
         try:
-            r = solve(data, g, a.iters, a.restarts, a.seed)
+            r = solve(data, g, a.iters, a.restarts, a.seed,
+                      exclude_rcs_safety=not a.include_rcs_safety)
         except ValueError as e:
             print(f"  {g:<14s} SKIP — {e}")
             continue
         rows.append(r)
-        print(f"  {g:<14s} 자리 {r['slots']:>2d} · 목적함수 {r['objective']:>9,.0f} · "
+        red = (a.baseline - r["objective"]) / a.baseline * 100
+        print(f"  {g:<14s} 자리 {r['slots']:>2d} · 목적함수 {r['objective']:>9,.0f} "
+              f"(기준 {a.baseline:,.0f} 대비 -{red:.1f}%) · "
               f"원자료와 다른 층에 놓인 모듈 {r['floors_changed']}개")
     if a.json:
         with open(a.json, "w", encoding="utf-8") as fp:

@@ -1,0 +1,8 @@
+{
+  "source": "Wrigley et al. (2019) Nucl. Eng. Des. 341:100-111, doi:10.1016/j.nucengdes.2018.10.023 — ScienceDirect 논문 페이지 공개 미리보기(Highlights, Graphical abstract, Introduction, Results & discussion 발췌). 본문 표는 보지 못했다.",
+  "baseline_objective": 14914,
+  "baseline_note": "Lapp (1989) 현장조립 배치, BOP 가 원자력섬 3면. RCS↔SIS·RHR·CS 연결(기준안에서 11,786)은 목적함수에서 제외.",
+  "reduction_pct": {"one_side_4F": 46.1, "one_side_3F": 45.4, "two_sides_3F": 33.9, "two_sides_4F": 37.8},
+  "optimum": {"one_side_4F": 8036},
+  "optimum_note": "8,036 은 그래픽 초록·Highlights 에 직접 나온 값(14,914 대비 -46.1% 와 일치). 다른 격자의 최적값은 감소율만 공개되어 여기 넣지 않는다."
+}

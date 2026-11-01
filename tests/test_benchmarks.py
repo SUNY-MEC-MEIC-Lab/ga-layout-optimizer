@@ -114,7 +114,7 @@ class TestStage2Reproduction(unittest.TestCase):
                           "two_sides_3F": 12, "two_sides_4F": 16})
         res = {}
         for g in ("one_side_4F", "one_side_3F"):
-            objs = {BW.solve(data, g, seed=s)["objective"]   # 기본 예산 200000×6
+            objs = {BW.solve(data, g, seed=s)["objective"]   # 기본 예산 200000×6, 논문 제외 규칙
                     for s in (20260826, 1)}
             print(f"\n  Wrigley 2019 {g}: 목적함수 {sorted(objs)}")
             self.assertEqual(len(objs), 1, f"{g}: seed 에 따라 해가 다르다 — 수렴 부족")
@@ -125,26 +125,23 @@ class TestStage2Reproduction(unittest.TestCase):
 
     def test_wrigley2019_paper_reproduction(self):
         """
-        논문(−33.9~46.1%) 대조. 기준안 좌표·기준 목적함수·모듈 재묶음은 논문에만 있고
-        데이터셋에 없다. 원논문에서 옮겨 적은 expected.json 이 있을 때만 돈다.
+        논문 대조. expected.json 의 값은 원논문 페이지에서 옮겨 적었다(출처는 파일 안에).
+        같은 데이터·같은 제외 규칙(RCS↔안전계통)에서 우리 최적값이 논문 최적값 이하인지 본다.
+        ※ RHR·SIS 배치 방식, RCP 위치, 거리 정의는 논문 본문에만 있어 문제가 완전히 같지는 않다.
         """
         exp_path = os.path.join(WRIGLEY, "expected.json")
         if not os.path.exists(exp_path):
-            self.skipTest(
-                "Wrigley 2019 논문 대조값 없음. 원논문(doi:10.1016/j.nucengdes.2018.10.023)"
-                "에서 격자별 최적 목적함수를 옮겨 적을 것:\n"
-                f"  {exp_path} = {{\"optimum\": {{\"one_side_4F\": …, \"one_side_3F\": …}}, "
-                "\"source\": \"표·쪽 번호\"}}\n"
-                "  ※ 기준 목적함수 14,914 는 출처를 확인하지 못한 값이다. 쓰지 말 것.")
+            self.skipTest(f"Wrigley 2019 논문 대조값 없음: {exp_path}")
         import bench_wrigley as BW
         with open(exp_path, encoding="utf-8") as fp:
             exp = json.load(fp)
         data = BW.load(os.path.join(WRIGLEY, "shearon_harris.xlsx"))
+        base = exp["baseline_objective"]
         for g, target in exp["optimum"].items():
             got = BW.solve(data, g)["objective"]
-            print(f"\n  {g}: 우리 {got:,.0f} · 논문 {target:,.0f}")
-            self.assertLessEqual(got, target * 1.05,
-                                 f"{g}: 논문 최적값보다 5% 넘게 나쁘다")
+            print(f"\n  {g}: 우리 {got:,.0f} (-{(base - got) / base * 100:.1f}%) · "
+                  f"논문 {target:,.0f} (-{exp['reduction_pct'][g]}%)")
+            self.assertLessEqual(got, target, f"{g}: 논문 최적값보다 나쁘다")
 
     def test_ejeh2019_appendix_b(self):
         """
