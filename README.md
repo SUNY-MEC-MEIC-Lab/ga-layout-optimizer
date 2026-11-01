@@ -9,6 +9,15 @@
 > 그리고 **실제 SMR 설계값(치수·차폐·배치·보안)을 LLM 대화에 입력하지 말 것** — 한계 13항.
 
 SMR·플랜트의 General Arrangement 배치를 최적화하는 Claude Code 플러그인 + MCP 서버 (Claude · ChatGPT · Codex).
+
+### 3D로 보기 — 현황 vs 최적화
+
+**[▶ 브라우저에서 3D 비교 열기](https://hajun011103.github.io/ga-layout-optimizer/)** — 예제 도면 4종의 원래 배치와 최적화 배치를
+같은 축척 3D로 나란히 보여준다 (three.js, 설치 불필요). 페이지 소스: [`docs/index.html`](docs/index.html) ·
+데이터 재생성: `python3 tools/make_viewer_data.py`.
+
+[![현황 대비 최적화 3D 비교](docs/preview.png)](https://hajun011103.github.io/ga-layout-optimizer/)
+
 **도면을 넣으면 그 공간을 더 작게** 만드는 배치를 결정론적 솔버로 찾고, 현황 도면과 같은 기준으로 비교한다.
 자연어 요구사항을 **Design Intent IR** 로 정형화하고, 사람이 승인한 IR 을 해시로 동결한 뒤,
 **결정론적 솔버**가 배치를 계산해 SVG / DXF 도면을 만든다.

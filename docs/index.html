@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>배치 최적화 3D 비교</title>
+<meta name="description" content="도면을 넣으면 같은 규칙을 지키면서 더 작은 배치를 찾는다 — 현황과 최적화 결과를 3D로 나란히 비교">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f4ef; --panel:#ffffff; --fg:#1c1c1a; --mut:#66655f; --line:#e2e0d8;
+  --acc:#2357d6; --good:#0f7a5f; --bad:#c2273d; --warn:#a15c00;
+  --scene:#eef0f3; --chip:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141416; --panel:#1d1d21; --fg:#ecebe6; --mut:#a3a29b; --line:#2e2e34;
+    --acc:#7aa2ff; --good:#45c49a; --bad:#ff6b7f; --warn:#f0b35a;
+    --scene:#202228; --chip:#26262b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141416; --panel:#1d1d21; --fg:#ecebe6; --mut:#a3a29b; --line:#2e2e34;
+  --acc:#7aa2ff; --good:#45c49a; --bad:#ff6b7f; --warn:#f0b35a;
+  --scene:#202228; --chip:#26262b;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 "Noto Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 16px 64px}
+header h1{font-size:clamp(26px,4vw,40px);line-height:1.25;margin:0 0 10px;letter-spacing:-.5px}
+header p{margin:0;color:var(--mut);max-width:760px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0 26px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.step b{display:block;margin-bottom:2px}
+.step span{color:var(--mut);font-size:14.5px}
+.step i{font-style:normal;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;font-size:13px;font-weight:700;margin-right:6px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:8px 16px;font:inherit;font-size:15px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.case-desc{color:var(--mut);margin:0 0 14px;font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat .k{color:var(--mut);font-size:14px}
+.stat .v{font-size:22px;font-weight:700;margin-top:2px}
+.stat .v small{font-size:15px;font-weight:500;color:var(--mut)}
+.stat .d{font-weight:700}
+.good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+.verdict{border-radius:12px;padding:12px 16px;margin-bottom:14px;border:1px solid var(--line);background:var(--panel)}
+.verdict b{display:block}
+.verdict span{color:var(--mut);font-size:14.5px}
+.verdict.ok{border-color:var(--good)} .verdict.no{border-color:var(--warn)}
+.views{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.view{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.view h2{font-size:16px;margin:0;padding:12px 14px 4px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.view h2 small{color:var(--mut);font-weight:500;font-size:14px}
+.canvas{position:relative;height:min(62vh,520px);min-height:320px;background:var(--scene);margin:8px;border-radius:10px;overflow:hidden;touch-action:none}
+.canvas canvas{display:block;width:100%;height:100%}
+.tip{position:absolute;pointer-events:none;background:rgba(20,20,22,.92);color:#fff;font-size:13px;line-height:1.45;padding:8px 10px;border-radius:8px;max-width:280px;display:none;z-index:2}
+.tip .r{color:#ff9aa8}
+.controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:14px 0}
+.controls label{display:flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
+.controls input[type=range]{width:160px}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--mut);margin:4px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.hint{color:var(--mut);font-size:14px;margin:8px 0 0}
+.note{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14.5px;color:var(--mut)}
+.note b{color:var(--fg)}
+.viol{margin-top:10px;font-size:14px}
+.viol summary{cursor:pointer;color:var(--fg)}
+.viol li{color:var(--mut);margin:3px 0}
+footer{margin-top:22px;color:var(--mut);font-size:13.5px}
+footer a{color:var(--acc)}
+@media (max-width:820px){
+  .steps,.stats{grid-template-columns:1fr}
+  .views{grid-template-columns:1fr}
+  .canvas{height:min(56vh,460px)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>도면을 넣으면, 같은 규칙을 지키면서 더 작게</h1>
+    <p>왼쪽은 원래 도면대로 놓인 배치이고, 오른쪽은 컴퓨터가 계산한 배치입니다. 두 화면은 같은 축척이라 크기를 그대로 비교할 수 있습니다. 마우스로 돌려 보세요.</p>
+  </header>
+
+  <div class="steps">
+    <div class="step"><b><i>1</i>도면을 읽습니다</b><span>CAD·PDF·이미지 도면에서 기기와 방의 위치·크기를 자동으로 읽어냅니다.</span></div>
+    <div class="step"><b><i>2</i>지켜야 할 규칙을 정합니다</b><span>"비상발전기 두 대는 18 m 이상 떨어뜨린다"처럼 안전 거리와 구역 분리 규칙을 적용합니다.</span></div>
+    <div class="step"><b><i>3</i>더 작은 배치를 찾습니다</b><span>규칙을 모두 지키면서 건물이 가장 작아지는 배치를 수만 번 바꿔 보며 계산합니다.</span></div>
+  </div>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <p class="case-desc" id="desc"></p>
+
+  <div class="stats">
+    <div class="stat"><div class="k">건물 바닥 면적</div><div class="v" id="s-area"></div><div class="d" id="s-area-d"></div></div>
+    <div class="stat"><div class="k">규칙을 어긴 곳</div><div class="v" id="s-viol"></div><div class="d" id="s-viol-d"></div></div>
+    <div class="stat"><div class="k">건물 가로 × 세로</div><div class="v" id="s-dim"></div><div class="d" id="s-dim-d"></div></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="c-viol" checked> 규칙을 어긴 기기 빨갛게 표시</label>
+    <label><input type="checkbox" id="c-ghost" checked> 오른쪽에 원래 건물 크기 점선 표시</label>
+    <label>층 띄워 보기 <input type="range" id="c-explode" min="0" max="30" value="0"></label>
+    <label><input type="checkbox" id="c-spin"> 자동 회전</label>
+    <button class="btn" id="c-reset">시점 처음으로</button>
+  </div>
+
+  <div class="views">
+    <section class="view">
+      <h2>지금 배치 (원래 도면) <small id="t-asis"></small></h2>
+      <div class="canvas" id="v-asis"><div class="tip"></div></div>
+    </section>
+    <section class="view">
+      <h2>최적화 배치 (계산 결과) <small id="t-opt"></small></h2>
+      <div class="canvas" id="v-opt"><div class="tip"></div></div>
+    </section>
+  </div>
+  <div class="legend" id="legend"></div>
+  <p class="hint">끌어서 회전 · 휠/두 손가락으로 확대 · 오른쪽 버튼(또는 두 손가락 끌기)으로 이동 · 기기에 마우스를 올리면 이름이 보입니다. 두 화면의 시점은 함께 움직입니다.</p>
+
+  <details class="viol" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
+
+  <div class="note">
+    <b>꼭 알아 두세요.</b> 여기 나온 도면은 모두 시연을 위해 만든 <b>가상 도면</b>이고, 거리 규칙 값도 <b>가정값</b>입니다. 실제 시설이나 실제 설계값이 아니므로 이 개선율을 성과로 인용하면 안 됩니다.
+    배치 좌표는 AI가 정한 것이 아니라, 같은 입력이면 항상 같은 답을 내는 계산 프로그램(결정론적 솔버)이 계산했습니다.
+    병원 사례처럼 더 줄일 여지가 없으면 프로그램은 개선을 지어내지 않고 "현재 배치 유지"라고 답합니다.
+    개념 검토용이며 시공용이 아닙니다 (NOT FOR CONSTRUCTION).
+  </div>
+  <footer>
+    탐색량 normal · seed <span id="f-seed"></span> · 결과 해시 <code id="f-hash"></code> ·
+    <a href="https://github.com/hajun011103/ga-layout-optimizer">GitHub 저장소</a> · 데이터 재생성: <code>python3 tools/make_viewer_data.py</code>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const CASES = window.GA_CASES || [];
+const LABELS = {
+  smr_aux: {
+    "FZ-A": "안전설비 A계열", "FZ-B": "안전설비 B계열 (A와 떨어져야 함)",
+    "FZ-DG-A": "비상발전기 A", "FZ-DG-B": "비상발전기 B (A와 떨어져야 함)",
+    "FZ-CTRL": "제어실", "FZ-RSP": "원격정지반", "FZ-HVAC": "공조 설비",
+    "FZ-CVCS": "냉각수 화학 처리", "FZ-RW": "방사성 폐기물 처리", "FZ-ACCESS": "출입·장비 반출입",
+    "FZ-LAB": "분석실", "FZ-TANK": "저장 탱크", "FZ-FUEL": "사용후연료 저장조",
+    "room": "복도", "obstacle": "움직일 수 없는 구조물 (계단·승강기)"
+  },
+  chem_plant: {
+    "PROCESS": "공정 설비", "STORAGE": "저장 탱크", "FIRED": "가열로 (불꽃)", "FLARE": "플레어 설비",
+    "COMP": "압축기", "UTIL": "유틸리티", "ELEC": "변전실", "OCCUPIED": "사람이 있는 건물 (제어실)",
+    "OPEN": "정비 공간", "obstacle": "움직일 수 없는 배관 받침대"
+  },
+  fpso_topside: {
+    "HAZ": "위험 구역 (가스 처리)", "SAFE": "안전 구역 설비", "LQ": "거주 구역",
+    "obstacle": "움직일 수 없는 크레인·플레어"
+  },
+  hospital_or: {
+    "STERILE": "청결 구역 (수술실)", "SEMI": "준청결 구역", "UNRES": "일반 구역", "DIRTY": "오염 처리실"
+  }
+};
+// 빨강 계열은 '규칙 위반' 표시에만 쓴다 — 범주 색에서 뺀다
+const PALETTE = ["#4e79a7","#f28e2b","#59a14f","#b07aa1","#edc948","#76b7b2","#9c755f",
+                 "#2f8f9d","#8cb369","#6b5b95","#c9a227","#5d8aa8","#a0785a","#3e7c59","#8e8cd8"];
+const FIXED = { obstacle: "#7d7f86", room: "#c9ccd2", opening: "#d9dce2" };
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("ko-KR");
+const isDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+
+let current = 0, explode = 0;
+const views = {
+  asis: makeView($("v-asis")),
+  opt: makeView($("v-opt")),
+};
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 5000);
+for (const v of Object.values(views)) {
+  v.controls = new OrbitControls(camera, v.renderer.domElement);
+  v.controls.enableDamping = false;
+  v.controls.addEventListener("change", renderAll);
+}
+
+function makeView(el) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  el.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.15));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+  sun.position.set(80, 160, 60);
+  scene.add(sun);
+  const root = new THREE.Group();
+  scene.add(root);
+  const v = { el, renderer, scene, root, tip: el.querySelector(".tip"), pick: [] };
+  new ResizeObserver(() => resize()).observe(el);
+  bindHover(v);
+  return v;
+}
+
+function resize() {
+  for (const v of Object.values(views)) {
+    const r = v.el.getBoundingClientRect();
+    v.renderer.setSize(r.width, r.height, false);
+  }
+  const r = views.asis.el.getBoundingClientRect();
+  camera.aspect = r.width / Math.max(1, r.height);
+  camera.updateProjectionMatrix();
+  renderAll();
+}
+
+function renderAll() {
+  for (const v of Object.values(views)) v.renderer.render(v.scene, camera);
+}
+
+function colorMap(c) {
+  const map = {}, groups = [];
+  let k = 0;
+  for (const b of [...c.asis.blocks, ...c.optimized.blocks]) {
+    if (b.group in map) continue;
+    map[b.group] = (b.group === b.kind && FIXED[b.kind]) || (b.kind === "obstacle" && FIXED.obstacle)
+      || PALETTE[k++ % PALETTE.length];
+    groups.push(b.group);
+  }
+  return { map, groups };
+}
+
+function floorBase(c) {
+  const fh = c.floor_heights, base = [];
+  let z = 0;
+  for (let f = 0; f < fh.length; f++) { base.push(z); z += fh[f]; }
+  return base;
+}
+
+function build(v, c, layout, colors, ghost) {
+  v.root.clear();
+  v.pick = [];
+  const W = layout.width, D = layout.depth;
+  const base = floorBase(c);
+  const cx = W / 2, cy = D / 2;
+  const bad = new Set(layout.violations.flatMap(x => x.blocks));
+  const why = {};
+  for (const x of layout.violations) for (const id of x.blocks) (why[id] ||= []).push(x.detail);
+  const showBad = $("c-viol").checked;
+  const lineCol = isDark() ? 0x9aa0aa : 0x4a4d55;
+
+  // 층 바닥판과 외곽선
+  for (let f = 0; f < c.floors; f++) {
+    const y = base[f] + explode * f;
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(W, 0.25, D),
+      new THREE.MeshStandardMaterial({ color: isDark() ? 0x3a3d45 : 0xffffff, transparent: true,
+                                       opacity: f === 0 ? 0.95 : 0.35, roughness: 1 }));
+    slab.position.set(0, y - 0.13, 0);
+    v.root.add(slab);
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry),
+                                        new THREE.LineBasicMaterial({ color: lineCol }));
+    edge.position.copy(slab.position);
+    v.root.add(edge);
+  }
+  // 원래 건물 크기 (점선)
+  if (ghost && $("c-ghost").checked) {
+    const gW = ghost.width, gD = ghost.depth;
+    const pts = [[-gW/2,-gD/2],[gW/2,-gD/2],[gW/2,gD/2],[-gW/2,gD/2],[-gW/2,-gD/2]]
+      .map(([x, z]) => new THREE.Vector3(x, 0.05, z));
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineDashedMaterial({ color: isDark() ? 0xf0b35a : 0xa15c00, dashSize: 2, gapSize: 1.2 }));
+    line.computeLineDistances();
+    v.root.add(line);
+  }
+  // 기기·방
+  for (const b of layout.blocks) {
+    const corridor = b.kind === "room" && b.group === "room";      // 복도는 바닥 띠로
+    const h = corridor ? Math.min(b.h, 0.6) : (b.kind === "room" ? Math.min(b.h, 3) : b.h);
+    const geo = new THREE.BoxGeometry(Math.max(b.w, 0.05), Math.max(h, 0.05), Math.max(b.d, 0.05));
+    const isBad = showBad && bad.has(b.id);
+    const col = isBad ? "#e5394f" : colors.map[b.group];
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, roughness: 0.75, metalness: 0.0,
+      transparent: corridor || b.kind === "opening", opacity: corridor ? 0.55 : (b.kind === "opening" ? 0.4 : 1),
+      emissive: isBad ? 0x5a0010 : 0x000000,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(b.x + b.w / 2 - cx, b.z + explode * b.f + h / 2, b.y + b.d / 2 - cy);
+    m.userData = { b, why: why[b.id] || [], label: (LABELS[c.key] || {})[b.group] || b.group };
+    v.root.add(m);
+    v.pick.push(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: isBad ? 0xff2d4a : 0x000000, transparent: !isBad, opacity: isBad ? 1 : 0.25 }));
+    e.position.copy(m.position);
+    v.root.add(e);
+  }
+}
+
+function frame(c) {
+  const W = Math.max(c.asis.width, c.optimized.width), D = Math.max(c.asis.depth, c.optimized.depth);
+  const H = c.floor_heights.reduce((a, b) => a + b, 0) + explode * (c.floors - 1);
+  const r = Math.hypot(W, D, H) / 2;
+  // 세로 화면(휴대폰)에서는 가로 시야가 좁아지므로 그만큼 뒤로 물러난다
+  const fit = camera.aspect < 1.2 ? 1.2 / Math.max(camera.aspect, 0.3) : 1.0;
+  const dist = r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.82 * fit;
+  const dir = new THREE.Vector3(0.75, 0.75, 1).normalize();
+  camera.position.copy(dir.multiplyScalar(dist)).add(new THREE.Vector3(0, H / 3, 0));
+  for (const v of Object.values(views)) { v.controls.target.set(0, H / 3, 0); v.controls.update(); }
+}
+
+function bindHover(v) {
+  const ray = new THREE.Raycaster(), p = new THREE.Vector2();
+  v.el.addEventListener("pointermove", ev => {
+    const r = v.el.getBoundingClientRect();
+    p.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    p.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(p, camera);
+    const hit = ray.intersectObjects(v.pick, false)[0];
+    if (!hit) { v.tip.style.display = "none"; return; }
+    const { b, why, label } = hit.object.userData;
+    v.tip.innerHTML = `<b>${esc(b.name)}</b><br>${esc(label)} · ${b.f + 1}층 · ${b.w.toFixed(1)} × ${b.d.toFixed(1)} m` +
+      (b.pinned ? "<br>고정 — 옮길 수 없음" : "") +
+      (why.length && $("c-viol").checked ? why.map(w => `<div class="r">⚠ ${esc(plain(w))}</div>`).join("") : "");
+    v.tip.style.display = "block";
+    const x = Math.min(ev.clientX - r.left + 14, r.width - 290);
+    v.tip.style.left = Math.max(6, x) + "px";
+    v.tip.style.top = Math.max(6, ev.clientY - r.top + 14) + "px";
+  });
+  v.el.addEventListener("pointerleave", () => v.tip.style.display = "none");
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+// "A↔B: 간극 7.00 m < 요구 18 m (근거: …)" → "A와 B 사이 7.0 m — 18 m 이상 떨어져야 함"
+function plain(d) {
+  const m = d.match(/^(.+?)↔(.+?): 간극 ([\d.]+) m < 요구 ([\d.]+) m/);
+  if (m) return `${m[1]}와 ${m[2]} 사이가 ${(+m[3]).toFixed(1)} m — ${(+m[4]).toFixed(0)} m 이상 떨어져야 함`;
+  if (/^외피/.test(d)) return "건물이 정해진 부지 크기를 넘음";
+  return d.replace(/\s*\(근거:.*\)\s*$/, "");
+}
+
+function show(i) {
+  current = i;
+  const c = CASES[i];
+  document.querySelectorAll(".tab").forEach((t, k) => t.setAttribute("aria-selected", k === i));
+  $("desc").textContent = c.desc;
+  const a = c.asis, o = c.optimized;
+  const red = c.footprint_reduction_pct;
+  const ok = o.hard === 0 && !c.asis_better && red > 0;
+  $("s-area").innerHTML = `${fmt(a.footprint)} → ${fmt(o.footprint)} <small>m²</small>`;
+  $("s-area-d").innerHTML = ok ? `<span class="good">${red.toFixed(1)}% 줄어듦</span>`
+                               : `<span class="warn">의미 있는 차이 없음</span>`;
+  $("s-viol").innerHTML = `${a.hard} → ${o.hard} <small>곳</small>`;
+  $("s-viol-d").innerHTML = o.hard === 0 ? `<span class="good">모든 규칙을 지킴</span>`
+                                         : `<span class="bad">아직 ${o.hard}곳 남음</span>`;
+  $("s-dim").innerHTML = `${a.width.toFixed(0)}×${a.depth.toFixed(0)} → ${o.width.toFixed(0)}×${o.depth.toFixed(0)} <small>m</small>`;
+  $("s-dim-d").innerHTML = `<span style="color:var(--mut);font-weight:500">${c.floors}개 층</span>`;
+  const vd = $("verdict");
+  vd.className = "verdict " + (ok ? "ok" : "no");
+  vd.innerHTML = ok
+    ? `<b class="good">더 작은 배치를 찾았습니다 — 설계 검토 후보</b><span>원래 배치에서 어긴 규칙 ${a.hard}곳을 모두 지키면서 바닥 면적을 ${red.toFixed(1)}% 줄였습니다.</span>`
+    : `<b class="warn">이 공간은 더 줄일 수 없었습니다 — 지금 배치를 유지하는 것이 낫습니다</b><span>이미 꽉 찬 평면이라, 규칙을 모두 지키면서 더 작게 만드는 배치를 찾지 못했습니다. 프로그램은 개선을 지어내지 않습니다.</span>`;
+  $("t-asis").textContent = `${fmt(a.footprint)} m²`;
+  $("t-opt").textContent = `${fmt(o.footprint)} m²`;
+  const colors = colorMap(c);
+  build(views.asis, c, a, colors, null);
+  build(views.opt, c, o, colors, a);
+  const L = LABELS[c.key] || {};
+  $("legend").innerHTML = colors.groups.map(g => `<span><i style="background:${colors.map[g]}"></i>${esc(L[g] || g)}</span>`).join("") +
+    `<span><i style="background:#e5394f"></i>규칙을 어긴 기기</span>`;
+  const all = [...a.violations.map(x => ["지금 배치", x]), ...o.violations.map(x => ["최적화 배치", x])];
+  $("viol-list").innerHTML = all.length ? all.map(([w, x]) => `<li><b>${w}</b> — ${esc(plain(x.detail))}</li>`).join("") : "<li>없음</li>";
+  $("f-seed").textContent = c.seed;
+  $("f-hash").textContent = c.result_sha256.slice(0, 12);
+  renderAll();
+}
+
+function rebuild(keepView) {
+  const c = CASES[current];
+  const colors = colorMap(c);
+  build(views.asis, c, c.asis, colors, null);
+  build(views.opt, c, c.optimized, colors, c.asis);
+  if (!keepView) frame(c);
+  renderAll();
+}
+
+$("tabs").innerHTML = CASES.map((c, i) => `<button class="tab" role="tab" data-i="${i}">${esc(c.title)}</button>`).join("");
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { show(+t.dataset.i); frame(CASES[current]); renderAll(); });
+$("c-viol").onchange = () => rebuild(true);
+$("c-ghost").onchange = () => rebuild(true);
+$("c-explode").oninput = e => { explode = +e.target.value; rebuild(true); };
+$("c-reset").onclick = () => { frame(CASES[current]); renderAll(); };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => rebuild(true));
+
+let spin = false;
+$("c-spin").onchange = e => { spin = e.target.checked; views.asis.controls.autoRotate = spin; if (spin) loop(); };
+function loop() {
+  if (!spin) return;
+  views.asis.controls.autoRotate = true;
+  views.asis.controls.autoRotateSpeed = 1.2;
+  views.asis.controls.update();
+  views.opt.controls.update();
+  requestAnimationFrame(loop);
+}
+
+if (CASES.length) { show(0); resize(); frame(CASES[0]); renderAll(); }
+else document.querySelector(".wrap").insertAdjacentHTML("beforeend", "<p>data.js 를 불러오지 못했습니다.</p>");
+</script>
+</body>
+</html>
