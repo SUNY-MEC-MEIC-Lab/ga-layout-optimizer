@@ -70,7 +70,12 @@ class AsIsSolution(G.Solution):
             if a is None:
                 continue                      # 좌표 없는 블록은 현황 평가에서 빠진다
             cl = b.clearance
-            w, d = b.footprint(self.rot[i])
+            # 현황은 '도면 치수' 로 평가한다. IR 치수는 규모 계획(program)으로 바뀌었을 수 있다 —
+            # 그 치수로 현황을 그리면 줄어든 실이 복도에서 떨어져 현황이 실제보다 나쁘게 채점된다.
+            if "w" in a and "d" in a:
+                w, d = a["w"] + 2 * cl, a["d"] + 2 * cl
+            else:
+                w, d = b.footprint(self.rot[i])
             rec_base = dict(x=a["x"] - cl, y=a["y"] - cl, w=w, d=d)
             for f in self.floors_of(i):
                 rec = dict(rec_base, f=f)

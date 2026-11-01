@@ -21,6 +21,7 @@ import argparse
 import json
 import math
 import os
+import re
 import statistics
 import sys
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -156,6 +157,68 @@ def _split_corridors(items: List[dict], aspect: float, seg: float) -> Tuple[List
     return out, n
 
 
+_CIRC_NAME = re.compile(r"CORRIDOR|\bCORR\b|^\s*HALL\b|^\s*VEST\b|LOBBY|Flur|Gang\b|Foyer|복도|로비", re.I)
+
+
+def _rect_partition(poly: List[List[float]], eps: float = 1e-6) -> Optional[List[Tuple[float, float, float, float]]]:
+    """
+    직교 다각형 → 겹치지 않는 직사각형들 (가로 띠로 자른 뒤 같은 x 구간을 세로로 합친다).
+    직교가 아니면 None.
+    """
+    pts = [tuple(p) for p in poly]
+    if len(pts) >= 2 and math.dist(pts[0], pts[-1]) < eps:
+        pts = pts[:-1]
+    n = len(pts)
+    if n < 4:
+        return None
+    vert = []
+    for k in range(n):
+        (x0, y0), (x1, y1) = pts[k], pts[(k + 1) % n]
+        if abs(x0 - x1) < 1e-3:
+            if abs(y0 - y1) > eps:
+                vert.append((x0, min(y0, y1), max(y0, y1)))
+        elif abs(y0 - y1) >= 1e-3:
+            return None
+    ys = sorted({round(p[1], 6) for p in pts})
+    bands = []
+    for ya, yb in zip(ys, ys[1:]):
+        ym = (ya + yb) / 2
+        xs = sorted(x for x, lo, hi in vert if lo < ym < hi)
+        bands.append((ya, yb, [(xs[k], xs[k + 1]) for k in range(0, len(xs) - 1, 2)]))
+    rects: List[List[float]] = []
+    open_: Dict[Tuple[float, float], List[float]] = {}
+    for ya, yb, ivs in bands:
+        nxt = {}
+        for iv in ivs:
+            key = (round(iv[0], 6), round(iv[1], 6))
+            if key in open_:
+                r = open_.pop(key); r[3] = yb; nxt[key] = r
+            else:
+                nxt[key] = [iv[0], ya, iv[1], yb]
+        rects += list(open_.values())
+        open_ = nxt
+    rects += list(open_.values())
+    return [(r[0], r[1], r[2] - r[0], r[3] - r[1]) for r in rects if r[2] - r[0] > 0.05 and r[3] - r[1] > 0.05]
+
+
+def _decompose_circulation(items: List[dict], tol: float = 0.98) -> Tuple[List[dict], int, int]:
+    out, n, pieces = [], 0, 0
+    for it in items:
+        poly = it.get("polygon")
+        if (poly is not None and it.get("rect_fill", 1.0) < tol and it["kind"] == "room"
+                and _CIRC_NAME.search(it.get("name") or "")):
+            rs = _rect_partition(poly)
+            if rs and len(rs) > 1:
+                n += 1
+                for k, (x, y, w, d) in enumerate(rs):
+                    out.append(dict(it, id=f"{it['id']}-P{k+1}", x=x, y=y, w=w, d=d, polygon=None,
+                                    rect_fill=1.0, name=it.get("name")))
+                pieces += len(rs)
+                continue
+        out.append(it)
+    return out, n, pieces
+
+
 def _equal_area_rects(items: List[dict], tol: float = 0.98) -> Tuple[List[dict], int]:
     """
     다각형 실(채움률 < tol)을 실제 면적과 같은 직사각형으로 바꾼다. 외접 사각형의 가로세로 비율을
@@ -255,6 +318,12 @@ def takeoff_to_ir(takeoffs: Sequence[dict], options: Optional[dict] = None
         if n_split:
             warns.append(f"가늘고 긴 실(복도로 판단) {n_split}개를 구간으로 나눴다 — 면적은 그대로, "
                          f"최적화가 동선 공간을 재배치할 수 있게. 복도를 그대로 두려면 해당 블록을 고정(pinned)할 것")
+
+    if o.get("decompose_circulation", True):
+        items, n_dec, n_pieces = _decompose_circulation(items)
+        if n_dec:
+            warns.append(f"ㄱ·ㄷ·T자 복도·로비 {n_dec}개를 직사각형 {n_pieces}조각으로 나눴다 — 같은 면적 직사각형으로 "
+                         f"뭉치면 복도의 갈래가 사라져 동선이 끊긴다")
 
     if o.get("irregular_shapes", "equal_area") == "equal_area":
         items, n_irr = _equal_area_rects(items)
@@ -356,11 +425,23 @@ def takeoff_to_ir(takeoffs: Sequence[dict], options: Optional[dict] = None
         "elevations": [],
         "constraints": [],
     }
+    # BIM(IFC) 은 층 표고를 안다 — 단일 파일이고 모든 층에 표고가 있으면 그 차이를 층고로 쓴다.
+    elev = []
+    if len(takeoffs) == 1:
+        fl = sorted(takeoffs[0].get("floors") or [], key=lambda f: f.get("index", 0))
+        if len(fl) == nf and nf >= 2 and all(isinstance(f.get("elevation_m"), (int, float)) for f in fl):
+            elev = [float(f["elevation_m"]) for f in fl]
     if o["floor_heights"]:
         fh = [float(x) for x in o["floor_heights"]]
         if len(fh) == 1 and nf > 1:
             fh = fh * nf
         ir["floor_heights"] = fh
+    elif elev and all(b > a for a, b in zip(elev, elev[1:])):
+        fh = [round(b - a, 4) for a, b in zip(elev, elev[1:])]
+        fh.append(fh[-1])
+        ir["floor_heights"] = fh
+        warns.append(f"층고를 IFC 층 표고 차이로 정했다: {fh} m — 최상층 층고는 표고로 알 수 없어 "
+                     f"바로 아래 층고({fh[-1]} m)를 썼다 (가정)")
     else:
         ask("floor_heights",
             f"층고(바닥~바닥, m)는 얼마입니까? 도면 평면에는 높이 정보가 없습니다 ({nf}개 층).",

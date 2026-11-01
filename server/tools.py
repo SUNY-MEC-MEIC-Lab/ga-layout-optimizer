@@ -415,9 +415,9 @@ class Tools:
     BLOCK_EDITABLE = {"name", "zone", "clearance", "h", "weight", "need_exterior", "need_crane",
                       "rotatable", "floor", "fire_zone", "train", "structure", "vital_area",
                       "success_path", "opening", "turbine", "pinned", "kind", "w", "d", "count",
-                      "instances"}
+                      "instances", "circulation", "optional"}
     TOP_EDITABLE = {"project", "n_floors", "floor_heights", "preset", "weights", "max_w", "max_d",
-                    "aspect_max", "grid_m", "crane_bay", "constraints"}
+                    "aspect_max", "grid_m", "crane_bay", "constraints", "search"}
 
     def ga_update_ir(self, project_id=None, patch=None, reason=None, **_):
         if not isinstance(patch, dict) or not patch:
@@ -435,7 +435,8 @@ class Tools:
         changes: List[str] = []
         unknown = {k for k in patch if not k.startswith("_")} - {"set", "blocks", "add_blocks", "remove_blocks", "add_links",
                                 "remove_links", "add_separations", "remove_separations",
-                                "add_elevations", "remove_elevations", "answered_questions"}
+                                "add_elevations", "remove_elevations", "answered_questions",
+                                "program"}
         if unknown:
             raise ToolError(f"알 수 없는 patch 키 {sorted(unknown)}")
 
@@ -541,6 +542,25 @@ class Tools:
             ir["elevations"] = [e for e in ir["elevations"] if (e.get("above"), e.get("below")) not in gone]
         for e in patch.get("add_elevations") or []:
             ir["elevations"].append(e)
+
+        if patch.get("program"):
+            # 실 규모 계획·동선 기능 — 규칙(면적·폭 + 근거)만 받고 치수는 엔진이 계산한다.
+            import program as PROGRAM
+            prog = dict(patch["program"])
+            for r in prog.get("rooms") or []:
+                if not r.get("basis"):
+                    raise ToolError(f"program 규칙 '{r.get('type')}' 에 근거(basis)가 없다 — 인용 없는 수치는 받지 않는다")
+            if (prog.get("corridor") or {}).get("width_m") and not prog["corridor"].get("basis"):
+                raise ToolError("program.corridor 에 근거(basis)가 없다")
+            asis_new = copy.deepcopy(asis) if asis is not None else None
+            prog["_asis"] = asis_new
+            changes += ["program: " + x for x in PROGRAM.apply_program(ir, prog)]
+            if asis_new is not None and asis_new != asis:
+                # 구간 나누기는 현황 좌표도 같은 규칙으로 나눈다 (결정론적 변환) — 해시를 새로 기록한다.
+                asis = asis_new
+                self.ws.wjson(asis_p, asis)
+                ir["asis_sha256"] = ASIS.asis_hash(asis)
+                changes.append("현황 배치(asis.json)를 같은 구간으로 나눔 — asis_sha256 갱신")
 
         # 층 수 정합: floor_heights 길이가 n_floors 와 다르면 한 값이면 확장
         fh = ir.get("floor_heights")

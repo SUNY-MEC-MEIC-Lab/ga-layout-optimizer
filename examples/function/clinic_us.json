@@ -1,0 +1,90 @@
+{
+  "_note": "실제 의료·치과 클리닉(미국, 2층, 업무시설 B·스프링클러 가정) — 기능 유지 요건. 검증된 공개 기준만 hard 로 쓰고, 미검증 값은 쓰지 않는다. 규칙이 없는 실(치과 진료실·사무실·대기실 등)은 줄이지 않는다.",
+  "_sources": {
+    "IBC": "IBC 2021 Ch.10 (UpCodes, 무수정 주 채택본: CT·IL·WI) — 1007.1.1, 1010.1.1, Table 1017.2, Table 1020.3",
+    "ADA": "2010 ADA Standards (access-board.gov) — 304.3.1, 404.2.3",
+    "FGI": "FGI Guidelines for Outpatient Facilities 2018, 2.1-3.2.1.2 (FGI 해석 PDF로 조항 확인, 수치는 업계 요약 — mcdmag.com)",
+    "CBC": "California Building Code 2022 1224.4.4 (UpCodes) — 캘리포니아 법. FGI 원문 대신 최소 치수 근거로만"
+  },
+  "program": {
+    "stack_cores": true,
+    "optional_corridors": true,
+    "corridor": {
+      "width_m": 1.525,
+      "basis": "ADA 2010 §304.3.1 휠체어 회전 지름 60 in (1.525 m) — 복도에서 휠체어가 돌 수 있게. IBC Table 1020.3 일반 최소 44 in 보다 넓다"
+    },
+    "rooms": [
+      {
+        "type": "exam",
+        "match": "EXAM|INTERACTION STATION|SCREEN EYE|ECG TEST|BLOOD DRAW|IMMUNIZ",
+        "min_area_m2": 7.43,
+        "target_area_m2": 9.29,
+        "min_clear_dim_m": 2.44,
+        "basis": "FGI OP 2018 2.1-3.2.1.2: 진료실 순바닥 80 sf (7.43 m²) + 진료대 옆 2'8\"; 목표 = ×1.25 (붙박이장·손씻기 — 가정); 최소 치수 8 ft = CBC 1224.4.4.1.1 (CA)"
+      },
+      {
+        "type": "treatment",
+        "match": "TRMT|TREATMENT|PROCEDURE",
+        "min_area_m2": 11.15,
+        "target_area_m2": 13.94,
+        "min_clear_dim_m": 3.05,
+        "basis": "CBC 2022 1224.4.4.1.2: 처치실 120 sf (11.15 m²), 최소 치수 10 ft; 목표 = ×1.25 (가정)"
+      },
+      {
+        "type": "toilet",
+        "match": "TOILET",
+        "min_clear_dim_m": 1.525,
+        "basis": "ADA 2010 §304.3.1 회전 공간 60 in — 짧은 변 확인만 (크기는 바꾸지 않음)"
+      }
+    ]
+  },
+  "set": {
+    "constraints": [
+      {
+        "id": "CIRC-ACCESS",
+        "params": {
+          "door_m": 0.815,
+          "via_rooms": 2,
+          "touch_tol_m": 1.0,
+          "exterior_access": "YARD|TRASH|RECEIV|GAS STOR|MECH"
+        },
+        "_why": "문 순폭 32 in = IBC 2021 §1010.1.1 / ADA §404.2.3. via_rooms 2 = 진료 스위트 안의 실(모델링 값). touch_tol 1.0 m = 벽 두께 + 다각형 근사"
+      },
+      {
+        "id": "CIRC-CONNECT",
+        "params": {
+          "min_width_m": 1.118,
+          "touch_tol_m": 1.0,
+          "must_include": [
+            "stair"
+          ]
+        },
+        "_why": "복도 최소 폭 44 in = IBC Table 1020.3"
+      },
+      {
+        "id": "EGRESS",
+        "params": {
+          "max_travel_m": 91.4,
+          "min_exits": 2,
+          "exit_separation_frac": 0.333,
+          "exempt": "PENTHOUSE|YARD"
+        },
+        "_why": "IBC Table 1017.2 B 스프링클러 300 ft; §1006.3 층당 2개 출구; §1007.1.1 대각선 1/3 (스프링클러). 직교거리는 보행거리의 하한"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.CIRC-ACCESS": 100000.0,
+      "constraint.CIRC-CONNECT": 100000.0,
+      "constraint.EGRESS": 100000.0
+    },
+    "search": {
+      "warm_temperature": 0.05
+    }
+  }
+}

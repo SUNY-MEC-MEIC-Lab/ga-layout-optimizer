@@ -1,0 +1,66 @@
+{
+  "_note": "가상 SMR 보조건물 — 계단·승강기 코어를 고정에서 풀되 층마다 같은 자리(수직 코어)로 묶고, 복도 구간은 필요한 만큼만 남긴다. 기기는 유지보수를 위해 복도에서 접근 가능해야 한다.",
+  "_sources": {
+    "IBC": "IBC 2021 §1006.3, §1007.1.1, Table 1020.3 (UpCodes 무수정 주 채택본)",
+    "10 CFR 50 App.R": "III.G.2 계열 분리(기존 요건에 이미 반영), III.J 비상조명 — 피난로 존재가 전제"
+  },
+  "program": {
+    "circulation": [
+      {
+        "match": "^CORE-",
+        "type": "stair",
+        "unpin": true
+      }
+    ],
+    "stack_cores": true,
+    "optional_corridors": true
+  },
+  "set": {
+    "constraints": [
+      {
+        "id": "CIRC-ACCESS",
+        "params": {
+          "door_m": 1.2,
+          "via_rooms": 0,
+          "touch_tol_m": 0.5,
+          "applies_to": [
+            "equipment",
+            "room"
+          ]
+        },
+        "_why": "기기 정비·반출을 위해 복도에 1.2 m 이상 접해야 한다 (가정값 — IAEA SSR-2/1 Req.29 정비 접근성은 정성 요건)"
+      },
+      {
+        "id": "CIRC-CONNECT",
+        "params": {
+          "min_width_m": 1.118,
+          "touch_tol_m": 0.5,
+          "must_include": [
+            "stair"
+          ]
+        },
+        "_why": "IBC Table 1020.3 복도 44 in 로 이어져 계단에 닿아야 한다"
+      },
+      {
+        "id": "EGRESS",
+        "params": {
+          "max_travel_m": 76.2,
+          "min_exits": 2,
+          "exit_separation_frac": 0.333
+        },
+        "_why": "층당 2개 출구 IBC §1006.3, 대각선 1/3 §1007.1.1 (검증). 보행거리 250 ft(F-1 스프링클러, Table 1017.2)는 이번 조사에서 미확인 — 가정"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.CIRC-ACCESS": 100000.0,
+      "constraint.CIRC-CONNECT": 100000.0,
+      "constraint.EGRESS": 100000.0
+    }
+  }
+}

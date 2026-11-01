@@ -1,0 +1,41 @@
+{
+  "_note": "가상 석유화학 플랜트 — 배관대를 고정에서 풀고 12 m 구간으로 나눠, 공정 설비가 쓰는 만큼만 남긴다. 공개 문헌(CCPS, GAP.2.5.2) 수치는 유료라 확인하지 못했다 — 아래 값은 가정임을 명시한다. 도로·소방차 접근로는 도면에 없어 고려하지 않았다 — 배관대 옆 통로를 접근로로 가정한다. 그래서 이 축소율은 과대평가일 수 있다.",
+  "_sources": {
+    "CCPS": "CCPS Guidelines for Siting and Layout of Facilities, 2nd ed. 2018 — 공정 설비를 주 배관대 양옆에 배치(배관대 = 공정 단위의 척추). 원문 수치 미확인"
+  },
+  "program": {
+    "segment": [
+      {
+        "match": "^PR-1",
+        "length_m": 12.0,
+        "type": "piperack",
+        "basis": "배관대는 공정 설비가 붙어 있는 구간만 필요하다 — 남는 구간은 없앨 수 있게"
+      }
+    ]
+  },
+  "set": {
+    "constraints": [
+      {
+        "id": "RACK-SERVE",
+        "params": {
+          "served": [
+            "zone:PROCESS",
+            "zone:COMP",
+            "zone:FIRED"
+          ],
+          "max_gap_m": 10.0
+        },
+        "_why": "공정·압축·가열 설비는 배관대에서 10 m 안 (배관 지선 길이 — 가정값, CCPS 원문 미확인). 배관대 구간은 하나로 이어져야 한다"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.RACK-SERVE": 100000.0
+    }
+  }
+}

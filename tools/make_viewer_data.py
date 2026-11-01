@@ -2,13 +2,18 @@
 """
 make_viewer_data.py — docs/data.js 를 만든다 (3D 비교 페이지용 데이터).
 
-예제 도면 4종을 MCP 도구와 같은 절차로 읽고(도면 → IR → 요건 적용 → Gate 1 → 동결),
-결정론적 솔버로 최적화한 뒤 현황 배치와 최적화 배치의 3D 좌표를 내보낸다.
+사례마다 MCP 도구와 같은 절차로 도면을 읽고(도면 → IR → 요건 → Gate 1 → 동결),
+'기능 유지 요건'(examples/function/*.json — 근거 인용) 을 적용해 결정론적 솔버로 최적화한다.
 좌표는 파서(현황)와 솔버(최적화)가 만든 그대로이며, 이 스크립트는 단위만 정리한다.
 
-  python3 tools/make_viewer_data.py            # effort normal, seed 20260826
+  python3 tools/make_viewer_data.py            # effort thorough, seed 20260826, 사례 병렬
+
+공개 실제 도면은 저장소에 넣지 않는다 — bench/real/public/ 에 받아 두면 포함된다.
+라이선스를 확인하지 못한 모델(publish_geometry=False)은 수치만 내보내고 형상은 내보내지 않는다.
+이전 data.js 의 결과(면적만 본 최적화)는 previous_area_only 로 옮겨 비교에 쓴다.
 """
 import json
+import multiprocessing as mp
 import os
 import shutil
 import sys
@@ -25,48 +30,60 @@ import tools as T            # noqa: E402
 
 OUT = os.path.join(ROOT, "docs", "data.js")
 SEED = 20260826
+FN = os.path.join(ROOT, "examples", "function")
+PUB = os.path.join(ROOT, "..", "bench", "real", "public")
 
 CASES = [
-    ("smr_aux", "원전 SMR 보조건물", "DXF 도면 · 3개 층 · 원전급 제약 (화재분리·다층 관통·중요구역 등)"),
-    ("chem_plant", "석유화학 공정 플랜트", "벡터 PDF 1:500 · 화재·폭발 이격 거리"),
-    ("fpso_topside", "FPSO 해상 플랜트 상부", "SVG · 2개 데크 · 위험구역 분리 · 무게중심"),
-    ("hospital_or", "병원 수술부", "PNG 스캔 · 청결/오염 동선 분리 · 이미 꽉 찬 평면"),
+    dict(key="smr_aux", src="example:smr_aux", req="smr_aux.json",
+         title="원전 SMR 보조건물", desc="가상 DXF · 3개 층 · 원전급 제약 + 계단 코어·복도 기능"),
+    dict(key="chem_plant", src="example:chem_plant", req="chem_plant.json",
+         title="석유화학 공정 플랜트", desc="가상 벡터 PDF 1:500 · 화재·폭발 이격 + 배관대 기능"),
+    dict(key="fpso_topside", src="example:fpso_topside", req="fpso_topside.json",
+         title="FPSO 해상 플랜트 상부", desc="가상 SVG · 2개 데크 · 위험구역 분리 + 크레인 작업반경"),
+    dict(key="hospital_or", src="example:hospital_or", req="hospital_or.json",
+         title="병원 수술부", desc="가상 PNG 스캔 · 청결/오염 분리 + 수술실 규모·침대 복도"),
+    dict(key="clinic_real", real=True, src=os.path.join(PUB, "clinic", "Clinic_Architectural.ifc"),
+         req="clinic_us.json",
+         title="실제 도면: 의료·치과 클리닉", desc="공개 BIM(IFC) · 실제 건물 · 2개 층 + 옥탑 · 실 260여 개",
+         source='BSI (2020) "Medical-Dental Test Files," buildingSMART International',
+         source_url="https://github.com/buildingsmart-community/Community-Sample-Test-Files",
+         license="CC BY 4.0",
+         changes="IfcSpace 를 직사각형 블록으로 근사하고 규모·배치를 재계산했다 (원본 파일은 수정하지 않음)",
+         publish_geometry=True),
+    dict(key="institute_real", real=True, src=os.path.join(PUB, "kit", "AC20-Institute-Var-2.ifc"),
+         req="office_de.json",
+         title="실제 도면: 연구소 건물 (독일)", desc="공개 BIM(IFC) · KIT 연구소 · 지하~다락 5개 층 · 사무실·실험실",
+         source="Karlsruhe Institute of Technology, AC20-Institute-Var-2.ifc",
+         source_url="https://downloads.steptools.com/docs/stpfiles/ifc/",
+         license="라이선스 미확인 — 3D 형상은 공개하지 않고 수치만 싣는다",
+         changes="", publish_geometry=False),
 ]
-
-
-# 공개 실제 도면. 파일은 저장소에 넣지 않는다(라이선스 표기만) — 경로에 받아 두면 포함된다.
-REAL_CASES = [dict(
-    key="clinic_real", real=True,
-    title="실제 도면: 의료·치과 클리닉",
-    desc="공개 BIM(IFC) · 실제 건물 · 2개 층 + 옥탑 · 실 260여 개 · 요건 없이 도면만으로",
-    path=os.environ.get("GA_CLINIC_IFC", os.path.join(ROOT, "..", "bench", "real", "public",
-                                                      "clinic", "Clinic_Architectural.ifc")),
-    source='BSI (2020) "Medical-Dental Test Files," buildingSMART International',
-    source_url="https://github.com/buildingsmart-community/Community-Sample-Test-Files",
-    license="CC BY 4.0",
-    changes="IfcSpace 를 직사각형 블록으로 근사하고 배치를 재계산했다 (원본 파일은 수정하지 않음)",
-)]
 
 
 def _r(v):
     return round(float(v), 3)
 
 
-def _blocks(spec, geo, fh):
+def _blocks(spec, geo, fh, notes):
     base = [sum(fh[:f]) for f in range(len(fh))]
     out = []
     for i, g in sorted(geo.items(), key=lambda kv: spec.blocks[kv[0]].id):
         b = spec.blocks[i]
         cl = b.clearance
         f = int(g["f"])
-        out.append(dict(
+        rec = dict(
             id=b.id, name=b.name, kind=b.kind,
             group=b.fire_zone or b.zone or b.kind,
             f=f, x=_r(g["x"] + cl), y=_r(g["y"] + cl),
             w=_r(g["w"] - 2 * cl), d=_r(g["d"] - 2 * cl),
             z=_r(base[f] if f < len(base) else g.get("z", 0.0)),
             h=_r(min(b.h, sum(fh[f:]) if f < len(fh) else b.h)),
-            pinned=bool(b.pinned)))
+            pinned=bool(b.pinned))
+        if b.circulation:
+            rec["circ"] = b.circulation
+        if notes.get(b.id):
+            rec["note"] = notes[b.id]
+        out.append(rec)
     return out
 
 
@@ -74,83 +91,103 @@ def _metrics(m, viols, tol=1e-6):
     hard = [v for v in viols if v.hard and v.amount > tol]
     return dict(width=m["width_m"], depth=m["depth_m"], footprint=m["footprint_m2"],
                 volume=m["volume_m3"], hard=m["hard_violation_count"], link=m["link_cost"],
-                violations=[dict(id=v.cid, detail=v.detail, blocks=list(v.blocks))
-                            for v in hard])
+                violations=[dict(id=v.cid, detail=v.detail, blocks=list(v.blocks)) for v in hard])
 
 
-def prepare_example(t, name):
-    r = t.ga_load_example(name=name)
-    pid = r["project"]["project_id"]
-    t.ga_apply_example_requirements(project_id=pid, name=name)
-    return pid
+def run_case(c):
+    tmp = tempfile.mkdtemp(prefix=f"viewer-{c['key']}-")
+    try:
+        t = T.Tools(T.Workspace(os.path.join(tmp, "ws"), allow_local_paths=True, allow_url_fetch=False))
+        with open(os.path.join(FN, c["req"]), encoding="utf-8") as fp:
+            req = json.load(fp)
+        if c["src"].startswith("example:"):
+            ex = c["src"].split(":", 1)[1]
+            pid = t.ga_load_example(name=ex)["project"]["project_id"]
+            t.ga_apply_example_requirements(project_id=pid, name=ex)
+        else:
+            r = t.ga_import_drawing(path=c["src"], options=req.get("import_options"))
+            pid = t.ga_create_project(takeoff_ids=[r["takeoff_id"]], project_name=c["key"])["project_id"]
+        patch = {k: v for k, v in req.items() if not k.startswith("_") and k != "import_options"}
+        t.ga_update_ir(project_id=pid, patch=patch, reason=f"기능 유지 요건 {c['req']}")
+        if not t.ga_validate(project_id=pid)["passed"]:
+            raise SystemExit(f"{c['key']}: Gate 1 실패")
+        t.ga_freeze(project_id=pid, approved_by="make_viewer_data", acknowledged_warnings=True)
+        d, ir = t._load_ir(pid)
+        asis = t.ws.rjson(os.path.join(d, "asis.json"))
+        out = os.path.join(tmp, "out")
+        s = pipeline.optimize_ir(ir, out, effort="thorough", seed=SEED, asis=asis)
+
+        spec = G.spec_from_dict(ir)
+        notes = {b["id"]: b["_program"] for b in ir["blocks"] if b.get("_program")}
+        a_sol = ASIS.AsIsSolution(spec, asis)
+        a_viols = a_sol.evaluate(detail=True)[4]
+        fh = list(a_sol.fh)
+        with open(os.path.join(out, "result.json"), encoding="utf-8") as fp:
+            res = json.load(fp)
+        idx = {b.id: i for i, b in enumerate(spec.blocks)}
+        geo = {idx[b["id"]]: dict(x=b["x"], y=b["y"], w=b["w"], d=b["d"], f=b["f"], z=b["z"])
+               for b in res["blocks"]}
+        o_viols = [type("V", (), dict(cid=v["id"], detail=v["detail"], amount=v["amount"],
+                                      hard=True, blocks=v["blocks"])) for v in res["hard_violations"]]
+        cmp_ = s["comparison"]
+        reqs = [dict(id=x["id"], why=x.get("_why", "")) for x in req.get("set", {}).get("constraints", [])]
+        rec = dict(
+            key=c["key"], title=c["title"], desc=c["desc"], floors=spec.n_floors, floor_heights=fh,
+            asis=dict(blocks=_blocks(spec, a_sol.geo, fh, {}), **_metrics(s["asis"], a_viols, ASIS.ASIS_TOL)),
+            optimized=dict(blocks=_blocks(spec, geo, fh, notes), **_metrics(s["optimized"], o_viols)),
+            footprint_reduction_pct=cmp_["footprint_reduction_pct"],
+            asis_better=bool(cmp_.get("asis_better")), verdict=cmp_["verdict"],
+            removed=res.get("removed", []), program=ir.get("_program_report", []),
+            requirements=reqs, req_note=req.get("_note", ""), req_sources=req.get("_sources", {}),
+            result_sha256=s["result_sha256"], seed=SEED)
+        for k in ("real", "source", "source_url", "license", "changes"):
+            if k in c:
+                rec[k] = c[k]
+        if c.get("real") and not c.get("publish_geometry", False):
+            rec["asis"]["blocks"] = []
+            rec["optimized"]["blocks"] = []
+            rec["geometry_withheld"] = True
+        return rec
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
-def prepare_drawing(t, path, name):
-    """공개 실제 도면 — 요건은 넣지 않는다 (도면에 없는 값을 지어내지 않는다)."""
-    r = t.ga_import_drawing(path=path)
-    return t.ga_create_project(takeoff_ids=[r["takeoff_id"]], project_name=name)["project_id"]
-
-
-def build_case(t, tmp, name, title, desc, pid, extra=None):
-    if not t.ga_validate(project_id=pid)["passed"]:
-        raise SystemExit(f"{name}: Gate 1 실패")
-    t.ga_freeze(project_id=pid, approved_by="make_viewer_data", acknowledged_warnings=True)
-    d, ir = t._load_ir(pid)
-    asis = t.ws.rjson(os.path.join(d, "asis.json"))
-    out = os.path.join(tmp, name)
-    s = pipeline.optimize_ir(ir, out, effort="normal", seed=SEED, asis=asis)
-
-    spec = G.spec_from_dict(ir)
-    a_sol = ASIS.AsIsSolution(spec, asis)
-    a_viols = a_sol.evaluate(detail=True)[4]
-    fh = list(a_sol.fh)
-    asis_blocks = _blocks(spec, a_sol.geo, fh)
-
-    with open(os.path.join(out, "result.json"), encoding="utf-8") as fp:
-        res = json.load(fp)
-    idx = {b.id: i for i, b in enumerate(spec.blocks)}
-    geo = {idx[b["id"]]: dict(x=b["x"], y=b["y"], w=b["w"], d=b["d"], f=b["f"], z=b["z"])
-           for b in res["blocks"]}
-    opt_blocks = _blocks(spec, geo, fh)
-    o_viols = [type("V", (), dict(cid=v["id"], detail=v["detail"], amount=v["amount"],
-                                  hard=True, blocks=v["blocks"]))
-               for v in res["hard_violations"]]
-
-    c = s["comparison"]
-    return dict(
-        key=name, title=title, desc=desc, floors=spec.n_floors, floor_heights=fh,
-        asis=dict(blocks=asis_blocks, **_metrics(s["asis"], a_viols, ASIS.ASIS_TOL)),
-        optimized=dict(blocks=opt_blocks, **_metrics(s["optimized"], o_viols)),
-        footprint_reduction_pct=c["footprint_reduction_pct"],
-        volume_reduction_pct=c["volume_reduction_pct"],
-        asis_better=bool(c.get("asis_better")),
-        verdict=c["verdict"],
-        result_sha256=s["result_sha256"], seed=SEED, **(extra or {}),
-    )
+def _previous():
+    """지난 data.js 의 결과 — 면적만 본 최적화. 이미 옮겨 둔 것이 있으면 그것을 유지한다."""
+    if not os.path.exists(OUT):
+        return {}
+    with open(OUT, encoding="utf-8") as fp:
+        src = fp.read()
+    try:
+        old = json.loads(src[src.index("=") + 1:].strip().rstrip(";"))
+    except ValueError:
+        return {}
+    prev = {}
+    for c in old:
+        prev[c["key"]] = c.get("previous_area_only") or dict(
+            footprint=c["optimized"]["footprint"], link=c["optimized"].get("link"),
+            hard=c["optimized"]["hard"], pct=c["footprint_reduction_pct"])
+    return prev
 
 
 def main():
-    tmp = tempfile.mkdtemp(prefix="viewer-")
-    try:
-        t = T.Tools(T.Workspace(os.path.join(tmp, "ws"), allow_local_paths=True,
-                                allow_url_fetch=False))
-        cases = []
-        jobs = [(n, ti, de, prepare_example(t, n), None) for n, ti, de in CASES]
-        for rc in REAL_CASES:
-            if not os.path.exists(rc["path"]):
-                print(f"  {rc['key']}: 도면 파일 없음 ({rc['path']}) — 건너뛴다. 받는 곳: {rc['source_url']}")
-                continue
-            extra = {k: rc[k] for k in ("real", "source", "source_url", "license", "changes")}
-            jobs.append((rc["key"], rc["title"], rc["desc"], prepare_drawing(t, rc["path"], rc["key"]), extra))
-        for name, title, desc, pid, extra in jobs:
-            print(f"  {name} …", flush=True)
-            c = build_case(t, tmp, name, title, desc, pid, extra)
-            print(f"    현황 {c['asis']['footprint']:,.0f} m² (위반 {c['asis']['hard']}) → "
-                  f"최적화 {c['optimized']['footprint']:,.0f} m² (위반 {c['optimized']['hard']}) "
-                  f"· {c['footprint_reduction_pct']}%")
-            cases.append(c)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    prev = _previous()
+    jobs = []
+    for c in CASES:
+        if not c["src"].startswith("example:") and not os.path.exists(c["src"]):
+            print(f"  {c['key']}: 도면 파일 없음 ({c['src']}) — 건너뛴다. 받는 곳: {c.get('source_url')}")
+            continue
+        jobs.append(c)
+    with mp.Pool(min(len(jobs), max(1, os.cpu_count() or 1))) as pool:
+        cases = pool.map(run_case, jobs)
+    for c in cases:
+        if c["key"] in prev:
+            c["previous_area_only"] = prev[c["key"]]
+        p = c.get("previous_area_only")
+        print(f"  {c['key']:15s} 현황 {c['asis']['footprint']:>9,.0f} m² (위반 {c['asis']['hard']}) → "
+              f"기능 유지 {c['optimized']['footprint']:>9,.0f} m² (위반 {c['optimized']['hard']}) "
+              f"{c['footprint_reduction_pct']:+.1f}% · 인접 {c['asis']['link']:,.0f}→{c['optimized']['link']:,.0f}"
+              + (f" | 이전(면적만) {p['pct']}%" if p else ""))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fp:
         fp.write("// 자동 생성: python3 tools/make_viewer_data.py — 손으로 고치지 말 것\n")

@@ -1,0 +1,47 @@
+{
+  "_note": "가상 FPSO 상부 — 크레인·플레어를 고정에서 푼다. 터렛은 선체의 계류점이라 상부 배치로 옮길 수 없는 유일한 요소로 남긴다(선체 설계를 바꾸는 일). 해양 기준(NORSOK, ISO 15544, DNV)은 유료라 확인하지 못해 수치는 가정이다.",
+  "program": {
+    "unpin": [
+      "CRANE-*",
+      "FLARE-*"
+    ],
+    "circulation": [
+      {
+        "match": "^CRANE",
+        "type": "crane"
+      }
+    ]
+  },
+  "blocks": [
+    {
+      "id": "FLARE-B",
+      "need_exterior": true
+    }
+  ],
+  "set": {
+    "constraints": [
+      {
+        "id": "RACK-SERVE",
+        "params": {
+          "served": [
+            "LD-1",
+            "LB-1"
+          ],
+          "max_gap_m": 20.0,
+          "rack_type": "crane",
+          "connected": false
+        },
+        "_why": "갑판 적치장·구명정은 크레인 작업반경 안 (20 m — 가정값, 실제 붐 길이로 바꿀 것)"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.RACK-SERVE": 100000.0
+    }
+  }
+}

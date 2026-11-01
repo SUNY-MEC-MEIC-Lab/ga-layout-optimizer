@@ -80,6 +80,18 @@ header p{margin:0;color:var(--mut);max-width:760px}
 .hint{color:var(--mut);font-size:14px;margin:8px 0 0}
 .note{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14.5px;color:var(--mut)}
 .note b{color:var(--fg)}
+.func{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14.5px}
+.func h3{font-size:16px;margin:0 0 8px}
+.func .cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.func .cmp div{background:var(--chip);border-radius:10px;padding:10px 12px}
+.func .cmp b{display:block;font-size:13px;color:var(--mut);font-weight:500}
+.func .cmp span{font-size:18px;font-weight:700}
+.func ul{margin:4px 0 8px;padding-left:20px}
+.func li{margin:3px 0;color:var(--fg)}
+.func li small,.func .src{color:var(--mut);font-size:13px}
+.func details{margin-top:6px}
+.withheld{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:18px;margin-bottom:14px;color:var(--mut)}
+@media (max-width:820px){.func .cmp{grid-template-columns:1fr}}
 .viol{margin-top:10px;font-size:14px}
 .viol summary{cursor:pointer;color:var(--fg)}
 .viol li{color:var(--mut);margin:3px 0}
@@ -109,14 +121,14 @@ footer a{color:var(--acc)}
 <body>
 <div class="wrap">
   <header>
-    <h1>도면을 넣으면, 같은 규칙을 지키면서 더 작게</h1>
-    <p>왼쪽은 원래 도면대로 놓인 배치이고, 오른쪽은 컴퓨터가 계산한 배치입니다. 두 화면은 같은 축척이라 크기를 그대로 비교할 수 있습니다. 마우스로 돌려 보세요.</p>
+    <h1>도면을 넣으면, 각 공간의 역할을 지키면서 더 작게</h1>
+    <p>왼쪽은 원래 도면대로 놓인 배치이고, 오른쪽은 컴퓨터가 계산한 배치입니다. 복도·계단·배관대도 움직일 수 있고, 필요 없는 구간은 없앨 수 있습니다 — 단, 방마다 드나들 수 있고, 복도가 이어지고, 계단까지 피난할 수 있어야 합니다. 두 화면은 같은 축척입니다.</p>
   </header>
 
   <div class="steps">
     <div class="step"><b><i>1</i>도면을 읽습니다</b><span>CAD·PDF·이미지 도면에서 기기와 방의 위치·크기를 자동으로 읽어냅니다.</span></div>
-    <div class="step"><b><i>2</i>지켜야 할 규칙을 정합니다</b><span>"비상발전기 두 대는 18 m 이상 떨어뜨린다"처럼 안전 거리와 구역 분리 규칙을 적용합니다.</span></div>
-    <div class="step"><b><i>3</i>더 작은 배치를 찾습니다</b><span>규칙을 모두 지키면서 건물이 가장 작아지는 배치를 수만 번 바꿔 보며 계산합니다.</span></div>
+    <div class="step"><b><i>2</i>공간마다 필요한 기능을 찾습니다</b><span>설비·실에 필요한 면적, 복도 폭, 문 폭, 계단까지 거리를 공개 기준(IBC·ADA·FGI·ASR 등)에서 찾아 근거와 함께 넣습니다. 근거가 없는 실은 줄이지 않습니다.</span></div>
+    <div class="step"><b><i>3</i>기능을 지키며 더 작게</b><span>안전 거리·출입·동선 연결·피난 규칙을 모두 지키면서 건물이 가장 작아지는 배치를 수만 번 바꿔 보며 계산합니다.</span></div>
   </div>
 
   <div class="tabs" role="tablist" id="tabs"></div>
@@ -128,6 +140,8 @@ footer a{color:var(--acc)}
     <div class="stat"><div class="k">건물 가로 × 세로</div><div class="v" id="s-dim"></div><div class="d" id="s-dim-d"></div></div>
   </div>
   <div class="verdict" id="verdict"></div>
+  <section class="func" id="func"></section>
+  <div class="withheld" id="withheld" hidden></div>
 
   <div class="controls">
     <label><input type="checkbox" id="c-model" checked> 실제 모양으로 보기</label>
@@ -160,13 +174,13 @@ footer a{color:var(--acc)}
   <details class="viol" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
 
   <div class="note">
-    <b>꼭 알아 두세요.</b> 앞의 네 탭은 시연을 위해 만든 <b>가상 도면</b>이고, 거리 규칙 값도 <b>가정값</b>입니다. 마지막 탭은 <b>공개된 실제 건물 BIM</b>을 그대로 읽은 것이지만, 동선·이격 요건은 넣지 않았습니다. 어느 쪽의 개선율도 성과로 인용하면 안 됩니다.
+    <b>꼭 알아 두세요.</b> 앞의 네 탭은 시연을 위해 만든 <b>가상 도면</b>이고, 뒤의 두 탭은 <b>공개된 실제 건물 BIM</b>입니다. 기능 요건은 탭마다 근거를 적었고, 확인하지 못한 값은 '가정'이라고 표시했습니다. 어느 쪽의 개선율도 성과로 인용하면 안 됩니다.
     배치 좌표는 AI가 정한 것이 아니라, 같은 입력이면 항상 같은 답을 내는 계산 프로그램(결정론적 솔버)이 계산했습니다.
     병원 사례처럼 더 줄일 여지가 없으면 프로그램은 개선을 지어내지 않고 "현재 배치 유지"라고 답합니다.
     개념 검토용이며 시공용이 아닙니다 (NOT FOR CONSTRUCTION).
   </div>
   <footer>
-    탐색량 normal · seed <span id="f-seed"></span> · 결과 해시 <code id="f-hash"></code> ·
+    탐색량 thorough · seed <span id="f-seed"></span> · 결과 해시 <code id="f-hash"></code> ·
     <a href="https://github.com/hajun011103/ga-layout-optimizer">GitHub 저장소</a> · 데이터 재생성: <code>python3 tools/make_viewer_data.py</code>
   </footer>
 </div>
@@ -432,6 +446,7 @@ function bindHover(v) {
         `<div>${esc(TYPES[type][1])}</div>` +
         `<div class="mt">${esc(label)} · ${b.f + 1}층 · ${b.w.toFixed(1)} × ${b.d.toFixed(1)} × ${b.h.toFixed(1)} m</div>` +
         (b.pinned ? `<div class="mt">고정 — 옮길 수 없음</div>` : "") +
+        (b.note ? `<div class="mt">📐 ${esc(b.note)}</div>` : "") +
         (why.length && $("c-viol").checked ? why.map(w => `<div class="r">⚠ ${esc(plain(w))}</div>`).join("") : "");
       setHover(b.id, v);
     }
@@ -509,28 +524,36 @@ function show(i) {
   const c = CASES[i];
   document.querySelectorAll(".tab").forEach((t, k) => t.setAttribute("aria-selected", k === i));
   $("desc").innerHTML = (c.real ? `<span class="real">실제 도면</span> ` : `<span class="fake">가상 도면</span> `) + esc(c.desc) +
-    (c.real ? `<br><small>출처: ${esc(c.source)} · <a href="${esc(c.source_url)}">${esc(c.source_url.replace("https://", ""))}</a> · ${esc(c.license)} · 변경: ${esc(c.changes)}</small>` : "");
+    (c.real ? `<br><small>출처: ${esc(c.source)} · <a href="${esc(c.source_url)}">${esc(c.source_url.replace("https://", ""))}</a> · ${esc(c.license)}${c.changes ? ` · 변경: ${esc(c.changes)}` : ""}</small>` : "");
   const a = c.asis, o = c.optimized;
   const red = c.footprint_reduction_pct;
   const ok = o.hard === 0 && !c.asis_better && red > 0;
   $("s-area").innerHTML = `${fmt(a.footprint)} → ${fmt(o.footprint)} <small>m²</small>`;
   $("s-area-d").innerHTML = ok ? `<span class="good">${red.toFixed(1)}% 줄어듦</span>`
-                               : `<span class="warn">의미 있는 차이 없음</span>`;
+                               : (red > 0.5 ? `<span class="warn">${red.toFixed(1)}% 줄었지만 채택 불가</span>`
+                                            : `<span class="warn">의미 있는 차이 없음</span>`);
   $("s-viol").innerHTML = `${a.hard} → ${o.hard} <small>곳</small>`;
   $("s-viol-d").innerHTML = o.hard === 0 ? `<span class="good">모든 규칙을 지킴</span>`
                                          : `<span class="bad">아직 ${o.hard}곳 남음</span>`;
   $("s-dim").innerHTML = `${a.width.toFixed(0)}×${a.depth.toFixed(0)} → ${o.width.toFixed(0)}×${o.depth.toFixed(0)} <small>m</small>`;
   $("s-dim-d").innerHTML = `<span style="color:var(--mut);font-weight:500">${c.floors}개 층</span>`;
+  const geo = !c.geometry_withheld;
+  for (const sel of [".controls", ".views", "#legend", ".hint", ".dex"]) document.querySelector(sel).hidden = !geo;
+  $("withheld").hidden = geo;
+  $("withheld").innerHTML = geo ? "" : `이 모델은 라이선스를 확인하지 못해 3D 형상은 싣지 않고 결과 수치만 보여 줍니다. (${esc(c.license || "")})`;
+  renderFunc(c);
   const vd = $("verdict");
   vd.className = "verdict " + (ok ? "ok" : "no");
   const linkX = a.link > 0 ? o.link / a.link : 1;
   const linkNote = linkX >= 1.5
     ? `<span class="warn" style="display:block;margin-top:6px">⚠ 대신 원래 서로 붙어 있던 방들이 멀어졌습니다 (인접 관계 비용 ${linkX.toFixed(1)}배). ` +
-      (c.real ? "이 도면에는 동선·인접 요건을 넣지 않았기 때문입니다 — 실제로 쓰려면 '어떤 방끼리 붙어 있어야 하는가'를 먼저 정해야 합니다." : "") + `</span>`
+      "출입·복도 연결·피난은 지켰지만, '어떤 방끼리 가까워야 하는가'(진료 동선 등)는 요건에 없었습니다.</span>"
     : "";
   vd.innerHTML = ok
-    ? `<b class="good">${c.real ? "면적은 줄었습니다 — 하지만 그대로 쓸 수는 없습니다" : "더 작은 배치를 찾았습니다 — 설계 검토 후보"}</b><span>${a.hard ? `원래 배치에서 어긴 규칙 ${a.hard}곳을 모두 지키면서 ` : "겹침·외곽 한계를 지키면서 "}바닥 면적을 ${red.toFixed(1)}% 줄였습니다.</span>${linkNote}`
-    : `<b class="warn">이 공간은 더 줄일 수 없었습니다 — 지금 배치를 유지하는 것이 낫습니다</b><span>이미 꽉 찬 평면이라, 규칙을 모두 지키면서 더 작게 만드는 배치를 찾지 못했습니다. 프로그램은 개선을 지어내지 않습니다.</span>`;
+    ? `<b class="good">기능을 지키면서 더 작은 배치를 찾았습니다 — 설계 검토 후보</b><span>${a.hard ? `원래 배치에서 걸린 ${a.hard}곳을 포함해 ` : ""}아래 기능 요건을 모두 지키면서 바닥 면적을 ${red.toFixed(1)}% 줄였습니다.</span>${linkNote}`
+    : (o.hard > 0 && red > 0
+       ? `<b class="warn">면적은 줄었지만 지켜야 할 규칙을 다 지키지 못해 채택할 수 없습니다</b><span>남은 위반 ${o.hard}곳 (${[...new Set(o.violations.map(v => REQ_NAME[v.id] || (v.id === "ENVELOPE" ? "현재 건물 외곽 안에 들어가야 함" : v.id)))].join(", ")}) — 아래 '어긴 규칙'을 보세요. 프로그램은 위반을 숨기지 않습니다.</span>`
+       : `<b class="warn">기능을 지키면서 더 줄일 수는 없었습니다 — 지금 배치를 유지하는 것이 낫습니다</b><span>기능 요건을 모두 지키는 더 작은 배치를 찾지 못했습니다. 이미 효율적인 평면이라는 뜻일 수 있습니다. 프로그램은 개선을 지어내지 않습니다.</span>`);
   $("t-asis").textContent = `${fmt(a.footprint)} m²`;
   $("t-opt").textContent = `${fmt(o.footprint)} m²`;
   focusType = null;
@@ -548,6 +571,31 @@ function show(i) {
   $("f-hash").textContent = c.result_sha256.slice(0, 12);
   renderAll();
 }
+
+function renderFunc(c) {
+  const p = c.previous_area_only, o = c.optimized, a = c.asis;
+  const pct = x => (x == null ? "—" : `${x > 0 ? "−" : "+"}${Math.abs(x).toFixed(1)}%`);
+  const cmp = `<div class="cmp">
+      <div><b>현황 (원래 도면)</b><span>${fmt(a.footprint)} m²</span><small> · 위반 ${a.hard}</small></div>
+      <div><b>이전 실행 — 면적만 보고 줄임</b><span>${p ? pct(p.pct) : "—"}</span><small>${p ? ` · ${fmt(p.footprint)} m² · 위반 ${p.hard}` + (p.new_rule_violations != null ? ` (새 기능 요건으로 재면 <b class="bad">${p.new_rule_violations}</b>)` : "") : " · 없음"}</small></div>
+      <div><b>이번 실행 — 기능을 지키며 줄임</b><span>${pct(c.footprint_reduction_pct)}</span><small> · ${fmt(o.footprint)} m² · 위반 ${o.hard}</small></div></div>`;
+  const reqs = (c.requirements || []).map(r => `<li><b>${esc(REQ_NAME[r.id] || r.id)}</b> <small>— ${esc(r.why)}</small></li>`).join("");
+  const prog = (c.program || []).map(x => `<li><small>${esc(x)}</small></li>`).join("");
+  const rem = (c.removed || []).length;
+  const src = Object.entries(c.req_sources || {}).map(([k, v]) => `<li><small><b>${esc(k)}</b> ${esc(v)}</small></li>`).join("");
+  $("func").innerHTML = `<h3>이번에 지킨 기능 요건</h3>${cmp}
+    <div class="src">${esc(c.req_note || "")}</div>
+    <ul>${reqs || "<li><small>추가 요건 없음</small></li>"}</ul>
+    ${rem ? `<div>필요 없는 복도·배관대 구간 <b>${rem}개</b>를 없앴습니다 — 위 요건이 남은 구간으로 지켜집니다.</div>` : ""}
+    ${prog ? `<details><summary>기준에 맞춰 바꾼 것 (실 규모·코어·복도 폭)</summary><ul>${prog}</ul></details>` : ""}
+    ${src ? `<details><summary>근거 문서</summary><ul>${src}</ul></details>` : ""}`;
+}
+const REQ_NAME = {
+  "CIRC-ACCESS": "모든 실은 복도에서 들어갈 수 있어야 함",
+  "CIRC-CONNECT": "층마다 복도·계단이 하나로 이어져야 함",
+  "EGRESS": "계단까지 피난 거리·계단 수·계단 간격",
+  "RACK-SERVE": "설비는 배관대(또는 크레인) 가까이, 배관대는 끊기지 않게",
+};
 
 function rebuild(keepView) {
   const c = CASES[current];

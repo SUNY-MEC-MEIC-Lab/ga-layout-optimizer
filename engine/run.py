@@ -103,6 +103,7 @@ def result_payload(spec: G.Spec, sol: G.Solution) -> dict:
                       for (i, f), s in sorted(shadows.items())],
         turbine_azimuth={spec.blocks[i].id: az
                          for i, az in sorted(sol.turbine_azimuth.items())},
+        removed=sorted(spec.blocks[i].id for i in getattr(sol, "off", ())),
         hard_violations=[dict(id=v.cid, amount=round(v.amount, 6), unit=v.unit,
                               blocks=v.blocks, detail=v.detail)
                          for v in viols if v.hard and v.amount > 1e-6],

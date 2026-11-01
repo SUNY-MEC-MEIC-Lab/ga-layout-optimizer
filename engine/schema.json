@@ -222,6 +222,17 @@
           "pinned": {
             "type": "boolean",
             "description": "true 면 fixed_xy(중심)·floor 에 정확히 고정된 장애물. 나머지 블록이 피해 간다. fixed_xy 와 floor 가 필수이며, 좌표는 도면 파서만 쓴다 — LLM 이 쓰지 않는다."
+          },
+          "circulation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "동선·공급 계통 요소의 종류 (corridor, stair, elevator, lobby, piperack …). CIRC-ACCESS·CIRC-CONNECT·EGRESS 제약이 참조한다."
+          },
+          "optional": {
+            "type": "boolean",
+            "description": "true 면 솔버가 이 블록을 없앨 수 있다 (예: 복도·배관대 구간). 기능은 동선 제약이 지킨다."
           }
         }
       }
@@ -419,6 +430,16 @@
       ],
       "pattern": "^[0-9a-f]{64}$",
       "description": "현황 배치(asis.json) 해시. 개선량 비교가 이 파일로부터 재현된다."
+    },
+    "search": {
+      "type": "object",
+      "description": "탐색 설정. warm_temperature: 현황에서 출발한 재시작의 초기 온도 배율(기본 1.0). 실제 평면에서 0.05 처럼 낮추면 현황 근처를 다듬는다.",
+      "properties": {
+        "warm_temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
     }
   }
 }

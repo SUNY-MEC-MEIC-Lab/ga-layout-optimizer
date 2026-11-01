@@ -1,0 +1,46 @@
+{
+  "_note": "가상 병원 수술부 — 기능 유지 요건 (가상 도면이지만 기준은 공개 문헌). 하이브리드 수술실은 문헌 값이 엇갈려(600–750 sf) 줄이지 않는다. 복도를 하나로 잇는 제약(CIRC-CONNECT)은 쓰지 않는다 — 이 수술부는 청결 복도와 일반 복도를 일부러 나눈 설계라, 잇게 하면 감염관리 동선 분리를 깬다.",
+  "_sources": {
+    "FGI": "FGI Guidelines for Hospitals 2014 — 수술실 400 sf, 최소 치수 20 ft (업계 기사 경유, 2018/2022판 미확인)",
+    "IBC": "IBC 2021 Table 1020.3 — I-2 침대 이동 복도 96 in"
+  },
+  "program": {
+    "optional_corridors": false,
+    "corridor": {
+      "width_m": 2.44,
+      "basis": "IBC 2021 Table 1020.3: I-2 침대 이동 복도 96 in (2.44 m)"
+    },
+    "rooms": [
+      {
+        "type": "or",
+        "match": "수술실 [0-9]$",
+        "min_area_m2": 37.2,
+        "target_area_m2": 46.5,
+        "min_clear_dim_m": 6.1,
+        "basis": "FGI 2014: 수술실 400 sf (37.2 m²), 최소 치수 20 ft (6.1 m); 목표 = ×1.25 (장비·동선 여유 — 가정)"
+      }
+    ]
+  },
+  "set": {
+    "constraints": [
+      {
+        "id": "CIRC-ACCESS",
+        "params": {
+          "door_m": 1.054,
+          "via_rooms": 1,
+          "touch_tol_m": 0.5
+        },
+        "_why": "I-2 침대 출입 문 41.5 in (IBC 2021 §1010.1.1)"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.CIRC-ACCESS": 100000.0
+    }
+  }
+}

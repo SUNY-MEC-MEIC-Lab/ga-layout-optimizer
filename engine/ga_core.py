@@ -72,6 +72,10 @@ class Block:
     kind: str = "equipment"              # equipment | room | obstacle | void | opening
     pinned: bool = False                 # True 면 fixed_xy(중심)·floor 에 '정확히' 고정된 장애물.
                                          # Sequence-Pair 에 들어가지 않고, 나머지 블록이 피해 간다.
+    # ---- 동선 기능 (CIRC-* 제약이 참조) ----
+    circulation: Optional[str] = None    # corridor | stair | elevator | lobby | piperack … (동선/공급 계통 요소)
+    optional: bool = False               # True 면 솔버가 이 블록을 '없앨' 수 있다 (복도·배관대 구간).
+                                         # 없애도 되는지는 CIRC-ACCESS·CIRC-CONNECT·EGRESS 가 판단한다.
 
     def footprint(self, rot: int) -> Tuple[float, float]:
         """clearance 를 포함한 실제 점유 치수. rot=1 이면 90도 회전."""
@@ -267,6 +271,7 @@ class Solution:
                 self.turbine_azimuth[i] = float(rng.choice(self.azimuths))
         self.gp: List[List[int]] = []
         self.gm: List[List[int]] = []
+        self.off: set = set()            # 없앤 optional 블록
         self._rebuild(rng)
 
     # -- 다층 관통 -------------------------------------------------------
@@ -289,8 +294,10 @@ class Solution:
         return [g for g in range(f, min(f + k, self.spec.n_floors))]
 
     def sp_floors(self, i: int) -> List[int]:
-        """Sequence-Pair 에 들어가는 층. 고정 장애물(pinned)은 순열에 넣지 않는다."""
-        return [] if self.spec.blocks[i].pinned else self.floors_of(i)
+        """Sequence-Pair 에 들어가는 층. 고정 장애물(pinned)·없앤 블록은 순열에 넣지 않는다."""
+        if self.spec.blocks[i].pinned or i in getattr(self, "off", ()):
+            return []
+        return self.floors_of(i)
 
     def _rebuild(self, rng: random.Random):
         self.gp = [[] for _ in range(self.spec.n_floors)]
@@ -324,6 +331,7 @@ class Solution:
         s.turbine_azimuth = dict(self.turbine_azimuth)
         s.gp = [list(g) for g in self.gp]
         s.gm = [list(g) for g in self.gm]
+        s.off = set(getattr(self, "off", ()))
         return s
 
     # ------------------------------------------------------------------
@@ -670,6 +678,8 @@ def hard_violations(spec: Spec, terms: Dict[str, float],
 
 MOVES = ("swap_p", "swap_m", "swap_both", "rotate", "move_floor", "shift",
          "turbine_rotate", "sync_pen")
+# optional 블록이 있을 때만 이동집합에 더한다 — 없는 IR 은 예전과 같은 난수열·같은 결과를 낸다.
+MOVES_OPT = MOVES + ("toggle_opt",)
 
 
 def optimize(spec: Spec, iters: int = 60000, restarts: int = 4,
@@ -688,6 +698,10 @@ def optimize(spec: Spec, iters: int = 60000, restarts: int = 4,
         curF = cur.evaluate()
         best, bestF = cur.clone(), curF
         T0r = T0 or max(1.0, abs(curF) * 0.08)
+        if init is not None and r == 0:
+            # 현황에서 출발한 재시작은 IR search.warm_temperature 배로 식혀 '현황 근처를 다듬는' 탐색이 되게 한다
+            # (실제 평면의 동선 구조를 첫 몇 걸음에 흩뜨리지 않게). 기본 1.0 = 예전과 같다.
+            T0r *= float(((getattr(spec, "source", None) or {}).get("search") or {}).get("warm_temperature", 1.0))
         hist = []
         for it in range(iters):
             T = T0r * (T1 / T0r) ** (it / max(1, iters - 1))
@@ -740,8 +754,11 @@ def repair_penetrations(sol: Solution, F0: float = None, max_rounds: int = 4,
                 n_p, n_m = len(best.gp[ff]), len(best.gm[ff])
                 # Γ⁺ 와 Γ⁻ 를 '동시에' 옮겨야 좌표가 맞는 경우가 대부분이다.
                 # 한쪽씩만 바꾸는 탐색은 그 조합을 영원히 찾지 못한다.
-                for pp in range(n_p):
-                    for pm in range(n_m):
+                # 층에 블록이 많으면 n² 평가가 폭발한다(실제 평면 130실 → 코어 하나에 1.7만 회) —
+                # 고르게 솎은 격자 최대 24×24 개만 본다 (결정론적; 작은 층은 전수 그대로).
+                sp_ = max(1, n_p // 24); sm_ = max(1, n_m // 24)
+                for pp in range(0, n_p, sp_):
+                    for pm in range(0, n_m, sm_):
                         cand = best.clone()
                         a = cand.gp[ff]; a.remove(i); a.insert(pp, i)
                         b = cand.gm[ff]; b.remove(i); b.insert(pm, i)
@@ -776,8 +793,12 @@ def repair_penetrations(sol: Solution, F0: float = None, max_rounds: int = 4,
 
 def _mutate(s: Solution, rng: random.Random):
     sp = s.spec
+    moves = getattr(sp, "_moves", None)
+    if moves is None:
+        moves = MOVES_OPT if any(b.optional for b in sp.blocks) else MOVES
+        sp._moves = moves
     for _ in range(12):
-        m = rng.choice(MOVES)
+        m = rng.choice(moves)
         f = rng.randrange(sp.n_floors)
         g = s.gp[f]
         if m in ("swap_p", "swap_m", "swap_both", "shift"):
@@ -826,6 +847,18 @@ def _mutate(s: Solution, rng: random.Random):
                             anchor = common[k - 1]
                             pos = a1.index(anchor) + 1 if anchor in a1 else 0
                         a1.insert(pos, i)
+                return
+        if m == "toggle_opt":
+            # optional 블록(복도·배관대 구간)을 없애거나 되살린다. 동선 제약이 기능을 지킨다.
+            cand = [i for i in range(s.n) if sp.blocks[i].optional and not sp.blocks[i].pinned]
+            if cand:
+                i = rng.choice(cand)
+                if i in s.off:
+                    s.off.discard(i)
+                    s._place(i, rng)
+                else:
+                    s._unplace(i)
+                    s.off.add(i)
                 return
         if m == "turbine_rotate" and s.turbine_azimuth:
             i = rng.choice(sorted(s.turbine_azimuth))

@@ -1,0 +1,89 @@
+{
+  "_note": "실제 연구소 건물(독일, KIT 공개 BIM) — 기능 유지 요건. 1인 사무실만 ASR 기준으로 맞추고, 인원을 모르는 실(학생 사무실·실험실·세미나실)은 줄이지 않는다.",
+  "_sources": {
+    "ASR A1.2": "ASR A1.2 Raumabmessungen und Bewegungsflächen §5(3)(4) — BGN 공식본 미러 (09/2013, 2022 개정)",
+    "ASR A1.8": "ASR A1.8 Verkehrswege 표 2",
+    "ASR A2.3": "ASR A2.3 Fluchtwege und Notausgänge §5, 표 1",
+    "MBO": "Musterbauordnung 11/2002 §33, §35(2), §36 (umwelt-online)"
+  },
+  "import_options": {
+    "layer_map": {
+      "^IFCFURNISHINGELEMENT": "ignore",
+      "^IFCFLOWTERMINAL": "ignore",
+      "^IFCBUILDINGELEMENTPROXY": "ignore"
+    }
+  },
+  "program": {
+    "stack_cores": true,
+    "optional_corridors": true,
+    "corridor": {
+      "width_m": 1.2,
+      "basis": "ASR A1.8 표 2 / ASR A2.3 표 1: 피난로 폭 1.20 m (이용자 ≤200명)"
+    },
+    "rooms": [
+      {
+        "type": "office_2p",
+        "match": "^Buero .*\\+",
+        "min_area_m2": 14.0,
+        "target_area_m2": 20.0,
+        "min_clear_dim_m": 2.0,
+        "basis": "ASR A1.2 §5(3) 첫 작업자 8 m² + 추가 6 m² = 14 m² 최소; §5(4) 셀 사무실 지침 8–10 m²/인 → 2인 20 m²"
+      },
+      {
+        "type": "office_1p",
+        "match": "^Buero (?!Studenten)",
+        "min_area_m2": 8.0,
+        "target_area_m2": 10.0,
+        "min_clear_dim_m": 2.0,
+        "basis": "ASR A1.2 §5(3) 최소 8 m², §5(4) 셀 사무실 지침 8–10 m²/인 → 10 m². 최소 치수 2.0 m 는 가정(책상 + 1.0 m 이동 폭, §5.1)"
+      }
+    ]
+  },
+  "set": {
+    "constraints": [
+      {
+        "id": "CIRC-ACCESS",
+        "params": {
+          "door_m": 0.8,
+          "via_rooms": 1,
+          "touch_tol_m": 1.0
+        },
+        "_why": "ASR A2.3 표 1 피난 문 최소 0.80 m"
+      },
+      {
+        "id": "CIRC-CONNECT",
+        "params": {
+          "min_width_m": 1.0,
+          "touch_tol_m": 1.0,
+          "must_include": [
+            "stair"
+          ]
+        },
+        "_why": "ASR A1.8 표 2 통로 1.00 m (≤20명)"
+      },
+      {
+        "id": "EGRESS",
+        "params": {
+          "max_travel_m": 35.0,
+          "min_exits": 1,
+          "exempt": "Dachboden|Technik"
+        },
+        "_why": "MBO §35(2) / ASR A2.3 §5(2): 계단까지 35 m. 이 건물은 계단이 1개 — 두 번째 피난로는 소방 구조장비(MBO §33(2), 이번 조사에서 미확인)로 보고 min_exits 1"
+      }
+    ],
+    "weights": {
+      "sep": 100000.0,
+      "exterior": 100000.0,
+      "envelope": 100000.0,
+      "crane": 100000.0,
+      "fixed": 100000.0,
+      "elev": 100000.0,
+      "constraint.CIRC-ACCESS": 100000.0,
+      "constraint.CIRC-CONNECT": 100000.0,
+      "constraint.EGRESS": 100000.0
+    },
+    "search": {
+      "warm_temperature": 0.05
+    }
+  }
+}

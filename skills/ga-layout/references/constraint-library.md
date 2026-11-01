@@ -44,18 +44,101 @@ IR 에는 이렇게 적는다.
 
 | ID | 이름 | 유형 | 근거 | 파라미터 |
 |---|---|---|---|---|
+| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access` |
+| `CIRC-CONNECT` | 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다 | hard | 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 §1020.2 복도 44 in = 1.118 m, ASR A1.8 표 1). | `min_width_m`*, `touch_tol_m`, `circulation_types`, `must_include` |
+| `EGRESS` | 피난 — 계단까지 거리·계단 수·계단 간 이격 | hard | IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다. | `max_travel_m`*, `exit_types`, `min_exits`, `exit_separation_frac`, `applies_to`, `exempt` |
 | `ELEC-SEP` | 전기계통 물리적 분리 | hard | GDC 17 + RG 1.75 Rev.3. ★ 현행 RG 1.75 Rev.3 본문에는 수치 이격거리가 전혀 없다. IEEE Std 384-1992 채택 시 원문이 1981년판 대비 "특정 형상에 대해 이격거리 기준이 축소되었다"고 명시했다. | `groups`*, `min_horizontal_m`*, `citation`*, `barrier_pairs` |
 | `FIRE-20FT` | 화재방호 계열 분리 (App. R III.G.2) | hard | 10 CFR 50 Appendix R III.G.2 — 고온정지 1계열 무손상: ①3시간 내화방벽 ②수평 20 ft(6.096 m) 초과 + 개재 가연물 0 + 감지·자동소화 ③1시간 방벽 + 감지·자동소화 중 하나. | `groups`*, `min_horizontal_m`, `gap_metric`, `combustible_free`*, `detection_and_suppression`*, `barrier_pairs` |
 | `FIRE-HATCH` | ★ 해치·계단에 의한 화재구역 병합 | hard | RG 1.189 Rev.5 — 벽·바닥에 해치·계단 같은 대형 미방호 개구부가 있으면 양쪽을 하나의 화재구역으로 간주한다. 예외는 성공경로 간 누적 수평거리 6.1 m + 개재 가연물 0 + 양쪽 층 감지·소화를 모두 만족할 때뿐. | `openings`*, `separation_m`, `combustible_free`*, `both_levels_protected`*, `merge_tolerance_m`, `required_distinct`, `penalty_m_per_conflict` |
 | `FREE-AREA` | 공지(free area) 제약 | hard | Ejeh 2019 LNG 플랜트 예제: 1층 면적의 50%를 작업공간, 최상층 60%를 비상공간으로 비워둔다. 원전의 레이다운 구역·비상대응 공간에 대응. 이 제약이 없으면 최적화기가 층을 가득 채운다. | `ground_floor_free_ratio`*, `top_floor_free_ratio`*, `include_clearance` |
 | `HELB-DIST` | 고에너지배관파단 — 거리에 의한 분리 | hard | NUREG-0800 BTP 3-3 원문: "방호의 선호되는 방법은 플랜트 배치에 의한 분리와 격리에 기반한다" — 거리에 의한 분리가 1순위, 구획벽 2순위, 중복성 의존이 최후수단. 명문 하드 제약: 주증기·주급수 배관을 주제어실 주변에 배선하지 말 것. 제트 확산 반각 ≤ 10°. | `sources`*, `targets`*, `min_dist_m`*, `jet_half_angle_deg`, `gap_metric` |
 | `LOAD-PATH` | 안전하중경로 (중량물 취급) | hard | NUREG-0612 §5.1.1 — 안전하중경로를 절차서와 기기배치도면에 명기하고, "단일 낙하가 안전정지에 필요한 계통의 중복 트레인을 동시에 무력화해서는 안 된다". SRP 9.1.5 심사 1항은 취급기기와 주요 형상의 설계 배치도를 명시적으로 요구한다. | `paths`*, `redundant_groups`*, `min_clearance_m` |
+| `RACK-SERVE` | 배관대 기능 — 공정 설비가 배관대에 붙어 있고 배관대가 끊기지 않아야 한다 | hard | CCPS Guidelines for Siting and Layout of Facilities (2018): 공정 설비는 주 배관대 양옆에 배치한다. 배관대 구간은 없앨 수 있지만(optional), 남은 배관대는 이어져 있어야 하고 설비는 max_gap 안에 있어야 한다. | `served`*, `max_gap_m`*, `rack_type`, `touch_tol_m`, `connected` |
 | `SEISMIC-GAP` | 구조물 간 내진 이격 (성능식) | hard | NUREG-0800 SRP 3.7.2 — 건물 간 이격은 고정 수치가 아니라 성능식이다. 구조물 전 높이에 대해 gap_ij ≥ δ_max,i + δ_max,j + 시공오차. ITAAC 에 as-built 대 as-designed gap 확인이 포함된다. | `structures`*, `construction_tolerance_m`* |
 | `TALL-EQUIP` | 다층 관통 기기 | hard | 층고보다 높은 기기(재장전수탱크·사용후연료저장조·해치)는 연속된 층을 점유한다. 관통부는 전 층에서 같은 평면 좌표를 가져야 하며 상부 층의 다른 기기와 겹칠 수 없다. | `align_tolerance_m` |
 | `TURBINE-25` | 터빈 미사일 금지 부채꼴 | hard | RG 1.115 — 저궤도 터빈 미사일은 터빈 휠 평면에서 ±25°로 벌어지는 부채꼴에 집중된다. 안전목표 P4 < 1e-7/년/호기. 부지 내 현재 및 장래의 모든 호기 strike zone 을 중첩해 검토해야 한다. | `turbine_block`*, `protected`*, `half_angle_deg`, `azimuth_deg`, `allowed_azimuths_deg`, `range_m`, `other_units` |
 | `VITAL-AREA` | 중요구역(vital area) 집약 및 2중 방벽 | hard | 10 CFR 73.55(e)(9) — "중요기기는 vital area 안에만 위치해야 하며, 접근에 최소 2중의 물리적 방벽 통과를 요구해야 한다". (f) target set 분석이 VA 경계를 역으로 결정한다. | `vital_blocks`*, `max_areas`*, `barrier_standoff_m`, `penalty_m_per_extra_area` |
 
 `*` 표시는 필수 파라미터 — 값이 null 이면 Gate 1 에서 ERROR.
+
+---
+
+## `CIRC-ACCESS` — 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1).
+
+**수식**
+
+```
+∀ 실 r: 동선 집합에서 '문 폭 이상 맞닿음' 간선으로 depth ≤ via_rooms+1 안에 도달
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `door_m` | m | ★ | — | 맞닿은 벽 길이 하한 = 문 순폭. 인용 필수. |
+| `via_rooms` | count |  | `1` | 다른 실을 거쳐 들어가도 되는 수 (진료실 안 화장실처럼). 0 이면 모든 실이 복도에 직접 접해야 함. |
+| `touch_tol_m` | m |  | `0.35` | 벽 두께 — 이 간극 이하면 맞닿은 것으로 본다. |
+| `applies_to` | kinds |  | `['room']` | 출입을 확인할 블록 종류. |
+| `circulation_types` | types |  | `['corridor', 'stair', 'elevator', 'lobby']` | 동선으로 보는 circulation 값. |
+| `exterior_access` | regex |  | — | 바깥 문으로 드나드는 실 이름 (예: YARD/TRASH/RECEIV) — 층 외곽에 닿으면 출입 가능. |
+
+---
+
+## `CIRC-CONNECT` — 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 §1020.2 복도 44 in = 1.118 m, ASR A1.8 표 1).
+
+**수식**
+
+```
+층마다 동선 블록 그래프(맞닿은 길이 ≥ min_width)가 연결요소 1개이고, must_include 종류를 포함
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `min_width_m` | m | ★ | — | 이어진 것으로 보는 맞닿은 길이 하한 = 복도 최소 폭. 인용 필수. |
+| `touch_tol_m` | m |  | `0.35` | 벽 두께. |
+| `circulation_types` | types |  | `['corridor', 'stair', 'elevator', 'lobby']` | 한 망으로 이어져야 하는 circulation 값. |
+| `must_include` | types |  | `['stair']` | 층마다 주 동선에 포함돼야 하는 종류. |
+
+---
+
+## `EGRESS` — 피난 — 계단까지 거리·계단 수·계단 간 이격
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다.
+
+**수식**
+
+```
+∀ 실: 직교거리(실 중심→가장 가까운 계단) ≤ max_travel ; 층당 계단 ≥ min_exits ; 최대 계단 간 거리 ≥ frac·대각선
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `max_travel_m` | m | ★ | — | 인용 필수. 직교거리는 실제 보행거리의 하한이므로 보수적이지 않다 — 여유를 둘 것. |
+| `exit_types` | types |  | `['stair']` | 출구로 보는 circulation 값. |
+| `min_exits` | count |  | `2` | 층당 출구(계단) 수. |
+| `exit_separation_frac` | ratio |  | — | 계단 간 최소 거리 / 층 대각선 (IBC 1007.1.1: 1/3 스프링클러, 1/2 비스프링클러). |
+| `applies_to` | kinds |  | `['room', 'equipment']` |  |
+| `exempt` | regex |  | — | 상주 인원이 없는 실(옥탑 기계실 등) — 피난 거리·출구 수 검사에서 뺀다. |
 
 ---
 
@@ -228,6 +311,32 @@ corridor(from→to, width) 와 교차하는 train 이 동일 중복군에서 2�
 
 **비고** 경로는 직교(bridge+trolley) 2구간 L자 두 가지 중 위반이 작은 쪽을 취한다.
 
+
+---
+
+## `RACK-SERVE` — 배관대 기능 — 공정 설비가 배관대에 붙어 있고 배관대가 끊기지 않아야 한다
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> CCPS Guidelines for Siting and Layout of Facilities (2018): 공정 설비는 주 배관대 양옆에 배치한다. 배관대 구간은 없앨 수 있지만(optional), 남은 배관대는 이어져 있어야 하고 설비는 max_gap 안에 있어야 한다.
+
+**수식**
+
+```
+∀ 설비 s ∈ served: gap(s, 배관대) ≤ max_gap ; 배관대 구간 그래프 연결
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `served` | selector | ★ | — | 배관대에서 배관을 받는 설비 선택자. |
+| `max_gap_m` | m | ★ | — | 설비–배관대 최대 간극 (배관 지선 길이). 인용 또는 가정 명시. |
+| `rack_type` | type |  | `piperack` | 공급 요소의 circulation 값 (piperack, crane …). |
+| `touch_tol_m` | m |  | `0.5` |  |
+| `connected` | bool |  | `True` | 공급 요소끼리 이어져 있어야 하는가 (배관대 true, 크레인 false). |
 
 ---
 
