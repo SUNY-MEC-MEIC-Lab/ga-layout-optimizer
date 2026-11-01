@@ -55,8 +55,9 @@ CASES = [
          title="실제 도면: 연구소 건물 (독일)", desc="공개 BIM(IFC) · KIT 연구소 · 지하~다락 5개 층 · 사무실·실험실",
          source="Karlsruhe Institute of Technology, AC20-Institute-Var-2.ifc",
          source_url="https://downloads.steptools.com/docs/stpfiles/ifc/",
-         license="라이선스 미확인 — 3D 형상은 공개하지 않고 수치만 싣는다",
-         changes="", publish_geometry=False),
+         license="공개 샘플 모델 — 사용 조건은 저장소 소유자가 확인 (2026-11-01)",
+         changes="IfcSpace 를 직사각형 블록으로 근사하고 규모·배치를 재계산했다 (원본 파일은 수정하지 않음)",
+         publish_geometry=True),
 ]
 
 
