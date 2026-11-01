@@ -30,6 +30,8 @@ SI_PREFIX = {"EXA": 1e18, "PETA": 1e15, "TERA": 1e12, "GIGA": 1e9, "MEGA": 1e6, 
 
 ROOM_TYPES = {"IFCSPACE"}
 OBSTACLE_TYPES = {"IFCCOLUMN", "IFCCOLUMNSTANDARDCASE", "IFCCHIMNEY"}
+_ROOF_SPACE = re.compile(r"^\s*((LOW |MAIN )?ROOF\b|지붕)", re.I)
+_VOID_SPACE = re.compile(r"^\s*(OPEN TO (BELOW|ABOVE)|SHAFT|CHASE|VOID|LUFTRAUM|오픈|보이드)", re.I)
 OPENING_TYPES = {"IFCSTAIR", "IFCSTAIRFLIGHT", "IFCOPENINGELEMENT", "IFCOPENINGSTANDARDCASE",
                  "IFCRAMP", "IFCRAMPFLIGHT", "IFCTRANSPORTELEMENT"}
 IGNORE_TYPES = {"IFCWALL", "IFCWALLSTANDARDCASE", "IFCWALLELEMENTEDCASE", "IFCCURTAINWALL",
@@ -594,9 +596,20 @@ def _read(data: bytes, filename: str, opts: dict) -> dict:
         return None
 
     # ---- 요소 --------------------------------------------------------------
+    n_void_spaces = 0
+    n_roof_spaces = 0
     skipped: Dict[str, int] = {}
     unknown: Dict[str, int] = {}
     no_floor = 0
+    # 벽·창·문에 뚫린 구멍(IfcOpeningElement)은 층을 관통하는 개구부가 아니다 — 빼야 한다.
+    # IfcRelVoidsElement(…, RelatingBuildingElement, RelatedOpeningElement) 의 호스트가 바닥판이 아니면 벽 구멍.
+    wall_holes = set()
+    for eid in sorted(ents):
+        t, a = ents[eid]
+        if t == "IFCRELVOIDSELEMENT" and len(a) >= 6 and isinstance(a[4], Ref) and isinstance(a[5], Ref):
+            host = ents.get(int(a[4]), ("", None))[0]
+            if not host.startswith("IFCSLAB") and not host.startswith("IFCROOF"):
+                wall_holes.add(int(a[5]))
     for eid in sorted(ents):
         t, a = ents[eid]
         kind = _kind_of(t)
@@ -612,6 +625,9 @@ def _read(data: bytes, filename: str, opts: dict) -> dict:
                     and t not in ("IFCSITE", "IFCBUILDING", "IFCBUILDINGSTOREY", "IFCPROJECT")):
                 unknown[t] = unknown.get(t, 0) + 1
             continue
+        if kind == "opening" and eid in wall_holes:
+            kind = "ignore"
+            t = t + "(벽 구멍)"
         if kind == "ignore":
             skipped[t] = skipped.get(t, 0) + 1
             continue
@@ -648,6 +664,14 @@ def _read(data: bytes, filename: str, opts: dict) -> dict:
                 labels.append(v)
         it["labels"] = labels
         it["name"] = long_name or obj_type or ""
+        # 지붕 면·아래층이 뚫린 공간·샤프트를 IfcSpace 로 모델링하는 경우가 흔하다 (공개 의료시설 모델:
+        # 'ROOF' 공간이 2층 기계실과 178 m² 겹쳤다). 배치 대상이 아니므로 비어 있는 공간(void)으로 둔다.
+        if t == "IFCSPACE" and _ROOF_SPACE.search(it["name"] or ""):
+            n_roof_spaces += 1          # 지붕 면은 바닥판이 아니다 — 아예 뺀다
+            continue
+        if t == "IFCSPACE" and _VOID_SPACE.search(it["name"] or ""):
+            it["kind"] = "void"
+            n_void_spaces += 1
         if t == "IFCSPACE" and name:
             it["id"] = _ID_SAFE.sub("-", name).strip("-")
         it["ifc_type"] = t
@@ -658,6 +682,12 @@ def _read(data: bytes, filename: str, opts: dict) -> dict:
             tk["warnings"].append(f"#{eid} {t} '{name}' — 압출 형상이 아니어서 외접 사각형으로 근사했다")
         tk["items"].append(it)
 
+    if n_roof_spaces:
+        tk["warnings"].append(f"지붕 면으로 보이는 IfcSpace {n_roof_spaces}개를 뺐다 (이름이 ROOF 등) — "
+                              f"바닥판이 아니어서 실과 겹친다")
+    if n_void_spaces:
+        tk["warnings"].append(f"뚫린 공간·샤프트로 보이는 IfcSpace {n_void_spaces}개를 배치 대상에서 뺐다 "
+                              f"(void — 고정, 외피 계산 제외). 실제 실이면 layer_map 으로 지정할 것")
     if no_floor:
         tk["warnings"].append(f"층 소속(IfcRelContainedInSpatialStructure)이 없는 요소 {no_floor}개를 "
                               f"{default_floor+1}층으로 두었다")
@@ -674,5 +704,27 @@ def _read(data: bytes, filename: str, opts: dict) -> dict:
     boundary_from_items(tk)
     normalize_origin(tk)
     finalize(tk, float(opts.get("min_size_m", 0.3)))
+    _compact_storeys(tk, [nm or f"{k+1}F" for k, (_e, _i, nm) in enumerate(storeys)])
     tk["stats"].update(ifc_entities=len(ents), storeys=len(storeys))
     return tk
+
+
+def _compact_storeys(tk: dict, all_labels: List[str]) -> None:
+    """
+    인식된 요소가 하나도 없는 층(기초 'TOF Footing' 같은)은 빼고 층 번호를 0 부터 다시 매긴다.
+    빼지 않으면 빈 층이 1층이 되어 층수·체적이 틀린다. 층 순서(표고 순)는 그대로다.
+    """
+    used = sorted({it["floor"] for it in tk["items"]} | {b["floor"] for b in tk["boundary"]})
+    if used == list(range(len(used))):
+        return
+    remap = {old: new for new, old in enumerate(used)}
+    labels = {f["index"]: f for f in tk["floors"]}
+    for it in tk["items"]:
+        it["floor"] = remap[it["floor"]]
+    for b in tk["boundary"]:
+        b["floor"] = remap[b["floor"]]
+    dropped = [nm for k, nm in enumerate(all_labels) if k not in remap]
+    tk["floors"] = [dict(labels.get(old, {"label": f"{new+1}F"}), index=new) for old, new in remap.items()]
+    tk["stats"]["floors"] = len(used)
+    if dropped:
+        tk["warnings"].append(f"요소가 없는 층 {len(dropped)}개를 뺐다: {', '.join(dropped)}")

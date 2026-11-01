@@ -41,6 +41,10 @@ header p{margin:0;color:var(--mut);max-width:760px}
 .tab{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:8px 16px;font:inherit;font-size:15px;cursor:pointer}
 .tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .case-desc{color:var(--mut);margin:0 0 14px;font-size:15px}
+.case-desc small{font-size:12.5px}
+.case-desc a{color:var(--acc)}
+.real,.fake{display:inline-block;font-size:12.5px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px}
+.real{background:var(--good);color:#fff}.fake{background:var(--chip);color:var(--mut);border:1px solid var(--line)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .stat .k{color:var(--mut);font-size:14px}
@@ -156,7 +160,7 @@ footer a{color:var(--acc)}
   <details class="viol" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
 
   <div class="note">
-    <b>꼭 알아 두세요.</b> 여기 나온 도면은 모두 시연을 위해 만든 <b>가상 도면</b>이고, 거리 규칙 값도 <b>가정값</b>입니다. 실제 시설이나 실제 설계값이 아니므로 이 개선율을 성과로 인용하면 안 됩니다.
+    <b>꼭 알아 두세요.</b> 앞의 네 탭은 시연을 위해 만든 <b>가상 도면</b>이고, 거리 규칙 값도 <b>가정값</b>입니다. 마지막 탭은 <b>공개된 실제 건물 BIM</b>을 그대로 읽은 것이지만, 동선·이격 요건은 넣지 않았습니다. 어느 쪽의 개선율도 성과로 인용하면 안 됩니다.
     배치 좌표는 AI가 정한 것이 아니라, 같은 입력이면 항상 같은 답을 내는 계산 프로그램(결정론적 솔버)이 계산했습니다.
     병원 사례처럼 더 줄일 여지가 없으면 프로그램은 개선을 지어내지 않고 "현재 배치 유지"라고 답합니다.
     개념 검토용이며 시공용이 아닙니다 (NOT FOR CONSTRUCTION).
@@ -181,6 +185,8 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { classify, TYPES, buildModel } from "./models.js";
 
 const CASES = window.GA_CASES || [];
+// 실제 도면에는 구역·계열 정보가 없다 — 모형 종류(진료실·사무실·화장실 …)로 색을 나눈다.
+for (const c of CASES) if (c.real) for (const L of [c.asis, c.optimized]) for (const b of L.blocks) b.group = "t:" + classify(b);
 const LABELS = {
   smr_aux: {
     "FZ-A": "안전설비 A계열", "FZ-B": "안전설비 B계열 (A와 떨어져야 함)",
@@ -350,7 +356,7 @@ function build(v, c, layout, colors, ghost) {
       if (dim) { o.material.transparent = true; o.material.opacity = Math.min(o.material.opacity, .12); o.material.depthWrite = false; }
     });
     obj.position.set(b.x + b.w / 2 - cx, b.z + explode * b.f, b.y + b.d / 2 - cy);
-    obj.userData = { b, type, why: why[b.id] || [], label: (LABELS[c.key] || {})[b.group] || b.group };
+    obj.userData = { b, type, why: why[b.id] || [], label: (LABELS[c.key] || {})[b.group] || (b.group.startsWith("t:") ? TYPES[type][0] : b.group) };
     v.root.add(obj);
     v.pick.push(obj);
     v.byId[b.id] = obj;
@@ -502,7 +508,8 @@ function show(i) {
   current = i;
   const c = CASES[i];
   document.querySelectorAll(".tab").forEach((t, k) => t.setAttribute("aria-selected", k === i));
-  $("desc").textContent = c.desc;
+  $("desc").innerHTML = (c.real ? `<span class="real">실제 도면</span> ` : `<span class="fake">가상 도면</span> `) + esc(c.desc) +
+    (c.real ? `<br><small>출처: ${esc(c.source)} · <a href="${esc(c.source_url)}">${esc(c.source_url.replace("https://", ""))}</a> · ${esc(c.license)} · 변경: ${esc(c.changes)}</small>` : "");
   const a = c.asis, o = c.optimized;
   const red = c.footprint_reduction_pct;
   const ok = o.hard === 0 && !c.asis_better && red > 0;
@@ -516,8 +523,13 @@ function show(i) {
   $("s-dim-d").innerHTML = `<span style="color:var(--mut);font-weight:500">${c.floors}개 층</span>`;
   const vd = $("verdict");
   vd.className = "verdict " + (ok ? "ok" : "no");
+  const linkX = a.link > 0 ? o.link / a.link : 1;
+  const linkNote = linkX >= 1.5
+    ? `<span class="warn" style="display:block;margin-top:6px">⚠ 대신 원래 서로 붙어 있던 방들이 멀어졌습니다 (인접 관계 비용 ${linkX.toFixed(1)}배). ` +
+      (c.real ? "이 도면에는 동선·인접 요건을 넣지 않았기 때문입니다 — 실제로 쓰려면 '어떤 방끼리 붙어 있어야 하는가'를 먼저 정해야 합니다." : "") + `</span>`
+    : "";
   vd.innerHTML = ok
-    ? `<b class="good">더 작은 배치를 찾았습니다 — 설계 검토 후보</b><span>원래 배치에서 어긴 규칙 ${a.hard}곳을 모두 지키면서 바닥 면적을 ${red.toFixed(1)}% 줄였습니다.</span>`
+    ? `<b class="good">${c.real ? "면적은 줄었습니다 — 하지만 그대로 쓸 수는 없습니다" : "더 작은 배치를 찾았습니다 — 설계 검토 후보"}</b><span>${a.hard ? `원래 배치에서 어긴 규칙 ${a.hard}곳을 모두 지키면서 ` : "겹침·외곽 한계를 지키면서 "}바닥 면적을 ${red.toFixed(1)}% 줄였습니다.</span>${linkNote}`
     : `<b class="warn">이 공간은 더 줄일 수 없었습니다 — 지금 배치를 유지하는 것이 낫습니다</b><span>이미 꽉 찬 평면이라, 규칙을 모두 지키면서 더 작게 만드는 배치를 찾지 못했습니다. 프로그램은 개선을 지어내지 않습니다.</span>`;
   $("t-asis").textContent = `${fmt(a.footprint)} m²`;
   $("t-opt").textContent = `${fmt(o.footprint)} m²`;
@@ -528,7 +540,7 @@ function show(i) {
   build(views.opt, c, o, colors, a);
   renderCards(c, colors);
   const L = LABELS[c.key] || {};
-  $("legend").innerHTML = colors.groups.map(g => `<span><i style="background:${colors.map[g]}"></i>${esc(L[g] || g)}</span>`).join("") +
+  $("legend").innerHTML = colors.groups.map(g => `<span><i style="background:${colors.map[g]}"></i>${esc(L[g] || (g.startsWith("t:") ? TYPES[g.slice(2)][0] : g))}</span>`).join("") +
     `<span><i style="background:#e5394f"></i>규칙을 어긴 기기</span>`;
   const all = [...a.violations.map(x => ["지금 배치", x]), ...o.violations.map(x => ["최적화 배치", x])];
   $("viol-list").innerHTML = all.length ? all.map(([w, x]) => `<li><b>${w}</b> — ${esc(plain(x.detail))}</li>`).join("") : "<li>없음</li>";

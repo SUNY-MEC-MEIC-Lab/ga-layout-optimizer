@@ -34,6 +34,20 @@ CASES = [
 ]
 
 
+# 공개 실제 도면. 파일은 저장소에 넣지 않는다(라이선스 표기만) — 경로에 받아 두면 포함된다.
+REAL_CASES = [dict(
+    key="clinic_real", real=True,
+    title="실제 도면: 의료·치과 클리닉",
+    desc="공개 BIM(IFC) · 실제 건물 · 2개 층 + 옥탑 · 실 260여 개 · 요건 없이 도면만으로",
+    path=os.environ.get("GA_CLINIC_IFC", os.path.join(ROOT, "..", "bench", "real", "public",
+                                                      "clinic", "Clinic_Architectural.ifc")),
+    source='BSI (2020) "Medical-Dental Test Files," buildingSMART International',
+    source_url="https://github.com/buildingsmart-community/Community-Sample-Test-Files",
+    license="CC BY 4.0",
+    changes="IfcSpace 를 직사각형 블록으로 근사하고 배치를 재계산했다 (원본 파일은 수정하지 않음)",
+)]
+
+
 def _r(v):
     return round(float(v), 3)
 
@@ -59,15 +73,25 @@ def _blocks(spec, geo, fh):
 def _metrics(m, viols, tol=1e-6):
     hard = [v for v in viols if v.hard and v.amount > tol]
     return dict(width=m["width_m"], depth=m["depth_m"], footprint=m["footprint_m2"],
-                volume=m["volume_m3"], hard=m["hard_violation_count"],
+                volume=m["volume_m3"], hard=m["hard_violation_count"], link=m["link_cost"],
                 violations=[dict(id=v.cid, detail=v.detail, blocks=list(v.blocks))
                             for v in hard])
 
 
-def build_case(t, tmp, name, title, desc):
+def prepare_example(t, name):
     r = t.ga_load_example(name=name)
     pid = r["project"]["project_id"]
     t.ga_apply_example_requirements(project_id=pid, name=name)
+    return pid
+
+
+def prepare_drawing(t, path, name):
+    """공개 실제 도면 — 요건은 넣지 않는다 (도면에 없는 값을 지어내지 않는다)."""
+    r = t.ga_import_drawing(path=path)
+    return t.ga_create_project(takeoff_ids=[r["takeoff_id"]], project_name=name)["project_id"]
+
+
+def build_case(t, tmp, name, title, desc, pid, extra=None):
     if not t.ga_validate(project_id=pid)["passed"]:
         raise SystemExit(f"{name}: Gate 1 실패")
     t.ga_freeze(project_id=pid, approved_by="make_viewer_data", acknowledged_warnings=True)
@@ -101,7 +125,7 @@ def build_case(t, tmp, name, title, desc):
         volume_reduction_pct=c["volume_reduction_pct"],
         asis_better=bool(c.get("asis_better")),
         verdict=c["verdict"],
-        result_sha256=s["result_sha256"], seed=SEED,
+        result_sha256=s["result_sha256"], seed=SEED, **(extra or {}),
     )
 
 
@@ -111,9 +135,16 @@ def main():
         t = T.Tools(T.Workspace(os.path.join(tmp, "ws"), allow_local_paths=True,
                                 allow_url_fetch=False))
         cases = []
-        for name, title, desc in CASES:
+        jobs = [(n, ti, de, prepare_example(t, n), None) for n, ti, de in CASES]
+        for rc in REAL_CASES:
+            if not os.path.exists(rc["path"]):
+                print(f"  {rc['key']}: 도면 파일 없음 ({rc['path']}) — 건너뛴다. 받는 곳: {rc['source_url']}")
+                continue
+            extra = {k: rc[k] for k in ("real", "source", "source_url", "license", "changes")}
+            jobs.append((rc["key"], rc["title"], rc["desc"], prepare_drawing(t, rc["path"], rc["key"]), extra))
+        for name, title, desc, pid, extra in jobs:
             print(f"  {name} …", flush=True)
-            c = build_case(t, tmp, name, title, desc)
+            c = build_case(t, tmp, name, title, desc, pid, extra)
             print(f"    현황 {c['asis']['footprint']:,.0f} m² (위반 {c['asis']['hard']}) → "
                   f"최적화 {c['optimized']['footprint']:,.0f} m² (위반 {c['optimized']['hard']}) "
                   f"· {c['footprint_reduction_pct']}%")

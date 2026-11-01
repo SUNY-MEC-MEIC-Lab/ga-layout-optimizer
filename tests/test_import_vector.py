@@ -199,6 +199,40 @@ class TestIfc(_Base):
         self.assertEqual(a[5][0], "IFCLENGTHMEASURE")
 
 
+class TestIfcRealWorldQuirks(_Base):
+    """공개 실제 모델(Medical-Dental Clinic, KIT Institute)에서 나온 문제 두 가지의 회귀 시험."""
+
+    def _variant(self):
+        with open(os.path.join(FIX, "plant.ifc"), encoding="utf-8") as fp:
+            txt = fp.read()
+        extra = """#70=IFCBUILDINGSTOREY('0Sty0000000000000000001',$,'Footing',$,$,#71,$,$,.ELEMENT.,-1500.);
+#71=IFCLOCALPLACEMENT(#31,#72);
+#72=IFCAXIS2PLACEMENT3D(#73,$,$);
+#73=IFCCARTESIANPOINT((0.,0.,-1500.));
+#74=IFCRELAGGREGATES('0Agg000000000000000009',$,$,$,#30,(#70));
+#600=IFCOPENINGELEMENT('0Opn601000000000000001',$,'Window hole',$,$,#601,#605,$,.OPENING.);
+#601=IFCLOCALPLACEMENT(#51,#602);
+#602=IFCAXIS2PLACEMENT3D(#603,#12,#13);
+#603=IFCCARTESIANPOINT((1000.,1000.,0.));
+#604=IFCRECTANGLEPROFILEDEF(.AREA.,$,#11b,1200.,300.);
+#606=IFCEXTRUDEDAREASOLID(#604,#10,#12,1500.);
+#607=IFCSHAPEREPRESENTATION(#9,'Body','SweptSolid',(#606));
+#605=IFCPRODUCTDEFINITIONSHAPE($,$,(#607));
+#610=IFCRELVOIDSELEMENT('0Voi610000000000000001',$,$,$,#400,#600);
+#611=IFCRELCONTAINEDINSPATIALSTRUCTURE('0Rel000000000000000002',$,$,$,(#600),#50);
+""".replace("#11b", "#106")
+        return txt.replace("ENDSEC;\nEND-ISO", extra + "ENDSEC;\nEND-ISO")
+
+    def test_empty_storey_dropped_and_wall_holes_ignored(self):
+        tk = I.import_file(self._variant().encode("utf-8"), "quirks.ifc", {})
+        self.assertEqual([f["label"] for f in tk["floors"]], ["Level 1", "Level 2"],
+                         "요소가 없는 기초 층이 1층으로 끼어들면 안 된다")
+        self.assertEqual(sorted({it["floor"] for it in tk["items"]}), [0, 1])
+        self.assertFalse([it for it in tk["items"] if it["kind"] == "opening"],
+                         "벽에 뚫린 창 구멍은 층 관통 개구부가 아니다")
+        self.assertTrue(any("Footing" in w for w in tk["warnings"]))
+
+
 class TestTable(_Base):
 
     def test_csv(self):

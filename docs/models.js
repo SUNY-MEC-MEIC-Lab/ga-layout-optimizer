@@ -12,8 +12,28 @@ const RULES = [
   [b => b.kind === "obstacle" && /^CRANE/.test(b.id), "crane"],
   [b => b.kind === "obstacle" && /^FLARE/.test(b.id), "flare"],
   [b => b.kind === "obstacle" && /^TURRET/.test(b.id), "turret"],
+  [b => /^stair|계단/i.test(b.name), "stair"],
+  [b => /^ELEVATOR$|승강기/i.test(b.name), "elevator"],
   [b => b.kind === "opening" || /해치/.test(b.name), "hatch"],
-  [b => b.kind === "room" && (b.group === "room" || /복도|CORR/.test(b.name)), "corridor"],
+  [b => b.kind === "void", "void"],
+  [b => b.kind === "room" && /복도|CORR/.test(b.name), "corridor"],
+  [b => /CORRIDOR|^VEST\b|^HALL/i.test(b.name), "corridor"],
+  [b => /TOILET|^JAN\b|화장실/i.test(b.name), "toilet"],
+  [b => /X-RAY|RADIOGRAPH|FUNDUS|DEVELOPING|FILM VIEW|MDIS|영상/i.test(b.name), "imaging"],
+  [b => /DENT|DTR\b|DIPC|PROSTH|CERAMIC|치과/i.test(b.name), "dental"],
+  [b => /WAIT|RECEPT|APPMTS|대기실|접수/i.test(b.name), "waiting"],
+  [b => /LOUNGE|BREAK|KITCHEN/i.test(b.name), "lounge"],
+  [b => /CONF\b|CONF\.|LIBRARY|CLASSROOM|GROUP|TEAM INTER|회의/i.test(b.name), "conference"],
+  [b => /SOIL|TRASH|DECON|DIRTY|오염/i.test(b.name), "soil"],
+  [b => /MECH\. YARD/i.test(b.name), "utility"],
+  [b => /MECH|ELEV\. EQUIP/i.test(b.name), "ahu"],
+  [b => /ELEC/i.test(b.name), "switchgear"],
+  [b => /COMM\. ROOM|ADP|COMPUTER/i.test(b.name), "server"],
+  [b => /GAS STOR/i.test(b.name), "tank"],
+  [b => /LAB\b|LAB$|SPECIMEN|PHARM/i.test(b.name), "lab"],
+  [b => /EXAM|TRMT|INTERACTION|BLOOD|IMMUNIZ|ECG|AUDIO|VISUAL|EYE|COUNSEL|CONSULT|ISOLATION|PSYCH|HIST|WTS|FITTING|진료/i.test(b.name), "exam"],
+  [b => /STOR|STO\.|CLEAN|SUP\.|ISSUE|PARTS|ARCHIVE|LIN\.|CL\.|DRESS|BENCHSTOCK|RECEIVING|600mm/i.test(b.name), "shelves"],
+  [b => /OFFICE|ADMIN|CMDR|SGT|MGR|DIR\b|DIR\.|ANALYST|SUPER|NCOIC|CREDENTIAL|RECORDS|COPY|CUBICLE|WORK|SEC\.|CHIEF|RMO|QA|HK|TECH|SQUAD|사무/i.test(b.name), "office"],
   [b => /수술실/.test(b.name), "or"],
   [b => /스크럽/.test(b.name), "scrub"],
   [b => /회복실|대기/.test(b.name), "beds"],
@@ -95,6 +115,16 @@ export const TYPES = {
   soil:        ["오염 처리실", "쓰고 난 기구·폐기물을 모으는 방. 청결 구역과 떨어져야 한다."],
   anes:        ["마취 준비실", "마취 약품과 장비를 준비하는 방."],
   corridor:    ["복도", "사람과 장비가 지나다니는 길."],
+  stair:       ["계단", "층을 오르내리는 계단."],
+  elevator:    ["엘리베이터", "환자·장비를 층간으로 옮기는 승강기."],
+  void:        ["뚫린 공간", "아래층이 내려다보이는 빈 공간. 바닥이 없어 배치하지 않는다."],
+  toilet:      ["화장실", "변기와 세면대가 있는 공간."],
+  imaging:     ["영상 촬영실", "X선 촬영 장비가 있는 방. 방사선 차폐가 필요하다."],
+  dental:      ["치과 진료실", "치과 의자와 진료 장비가 있는 방."],
+  waiting:     ["대기실·접수", "환자가 기다리는 의자 줄과 접수대."],
+  conference:  ["회의실", "큰 테이블과 의자가 있는 방."],
+  exam:        ["진료실·검사실", "진료 침대와 책상이 있는 방."],
+  office:      ["사무실", "책상과 의자가 있는 업무 공간."],
   generic:     ["기타 설비", "기타 설비."],
 };
 
@@ -431,6 +461,71 @@ const B = {
     room(g, L, S, H, a);
     fill(3, i => { box(g, mat(0x88a9c9), .6, 1.0, .5, -1.4 + i * 1.4, 0, -S * .2); });
     box(g, mat(C.white), 2, .9, .7, 0, 0, S * .25);
+  },
+  stair(g, L, S, H, a) {
+    const n = Math.max(6, Math.round(L / .3)), tread = L / n, rise = Math.min(H, 4.5) / n;
+    fill(n, i => box(g, mat(C.concrete, { r: .95 }), tread, rise * (i + 1), S * .9, -L / 2 + (i + .5) * tread, 0, 0));
+  },
+  elevator(g, L, S, H, a) {
+    box(g, mat(C.steel, { m: .5 }), L, Math.min(H, 4), S);
+    box(g, mat(C.dark), L * .5, 2.1, .05, 0, 0, S / 2 + .01);
+    box(g, mat(C.glow, { e: C.glow, ei: .6 }), .15, .15, .03, L * .32, 1.2, S / 2 + .03);
+  },
+  void(g, L, S, H, a) {
+    box(g, mat(0x9fb8d6, { t: .25 }), L, .05, S);
+  },
+  toilet(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    const n = Math.max(1, Math.floor(L / 1.2));
+    fill(n, i => { const x = -L / 2 + .6 + i * 1.2;
+      box(g, mat(C.white), .45, .45, .65, x, 0, -S / 2 + .5); box(g, mat(C.white), .45, .5, .2, x, .45, -S / 2 + .25); });
+    box(g, mat(C.white), Math.min(L * .6, 2.4), .85, .5, 0, 0, S / 2 - .4);
+  },
+  imaging(g, L, S, H, a) {
+    room(g, L, S, H, a, 2.2);
+    box(g, mat(C.white), 2.2, .75, .8);
+    box(g, mat(C.steel, { m: .4 }), .25, 2.4, .25, -1.4, 0, -.9);
+    box(g, mat(C.white), .9, .5, .6, -.6, 1.8, -.9);
+    box(g, mat(C.yellow), .35, .35, .02, L / 2 - .3, 1.6, 0);          // 방사선 경고 표지
+  },
+  dental(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    for (const [x, z] of rows(L * .85, S * .8, 2.4, 2.4, .6, .6)) {
+      const ch = new THREE.Group();
+      box(ch, mat(C.steel, { m: .5 }), .4, .5, .4);
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, .15, .6), mat(0x5aa7c9)); seat.position.set(0, .7, 0); seat.rotation.z = .25; ch.add(seat);
+      box(ch, mat(C.white), .1, 1.6, .1, -.7, 0, .5); cyl(ch, mat(C.white, { e: 0xfff6c9, ei: .5 }), .2, .1, -.4, 1.6, .5);
+      ch.position.set(x, 0, z); g.add(ch);
+    }
+  },
+  waiting(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    for (const [x, z] of rows(L * .8, S * .6, .55, .55, .05, 1.3)) {
+      box(g, mat(0x6d8fb3), .5, .45, .5, x, 0, z); box(g, mat(0x6d8fb3), .5, .4, .08, x, .45, z - .21);
+    }
+    box(g, mat(C.white), Math.min(L * .4, 3), 1.05, .6, 0, 0, S / 2 - .5);
+  },
+  conference(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    const tl = Math.max(1.6, L * .55), ts = Math.max(1, S * .35);
+    box(g, mat(0xb08a5a), tl, .75, ts);
+    const n = Math.max(2, Math.floor(tl / .8));
+    fill(n, i => { const x = -tl / 2 + .4 + i * tl / n;
+      for (const z of [-(ts / 2 + .4), ts / 2 + .4]) box(g, mat(C.dark), .45, .45, .45, x, 0, z); });
+  },
+  exam(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    box(g, mat(C.steel), .7, .65, 1.9, -L * .2, 0, 0); box(g, mat(0x9ad0c2), .7, .1, 1.9, -L * .2, .65, 0);
+    box(g, mat(C.white), 1.2, .75, .6, L * .25, 0, -S / 2 + .5);
+    box(g, mat(C.dark), .45, .45, .45, L * .25, 0, -S / 2 + 1.2);
+  },
+  office(g, L, S, H, a) {
+    room(g, L, S, H, a);
+    for (const [x, z] of rows(L * .8, S * .7, 1.4, .7, 1.0, 1.2)) {
+      box(g, mat(C.white), 1.4, .75, .7, x, 0, z);
+      box(g, mat(C.screen, { e: C.glow, ei: .3 }), .55, .35, .04, x, .75, z - .2);
+      box(g, mat(C.dark), .45, .45, .45, x, 0, z + .65);
+    }
   },
   corridor(g, L, S, H, a) {
     box(g, mat(a, { t: .55 }), L, Math.min(H, .6), S);

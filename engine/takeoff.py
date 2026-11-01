@@ -43,6 +43,8 @@ DEFAULTS = dict(
     floor_heights=None,           # None → 질문 목록에 올린다 (엔진 기본값 사용)
     stack_files=True,             # 단일층 파일 여러 개 → 파일 순서대로 1층, 2층 …
     aspect_margin=0.05,
+    irregular_shapes="equal_area",  # ㄱ·ㄷ자 실: 같은 면적 직사각형 | "bbox" = 외접 사각형(구 동작)
+    resolve_overlaps=True,        # 현황에서 겹친 실·기기를 맞닿은 면에서 잘라 떼어 놓는다
 )
 
 
@@ -154,6 +156,80 @@ def _split_corridors(items: List[dict], aspect: float, seg: float) -> Tuple[List
     return out, n
 
 
+def _equal_area_rects(items: List[dict], tol: float = 0.98) -> Tuple[List[dict], int]:
+    """
+    다각형 실(채움률 < tol)을 실제 면적과 같은 직사각형으로 바꾼다. 외접 사각형의 가로세로 비율을
+    유지하고 중심도 그대로 둔다. 실제 평면의 ㄱ·ㄷ자 복도·실은 외접 사각형끼리 크게 겹친다
+    (공개 의료시설 모델: 1개 층에서 외접 사각형 합이 바닥 면적보다 5% 컸다). 고정 요소는 건드리지 않는다.
+    """
+    out, n = [], 0
+    for it in items:
+        fill = it.get("rect_fill", 1.0)
+        if (it.get("polygon") is not None and fill < tol and it["kind"] in ("room", "equipment")
+                and not it.get("unplaced")):
+            k = math.sqrt(max(fill, 0.05))
+            w, d = it["w"] * k, it["d"] * k
+            it = dict(it, x=it["x"] + (it["w"] - w) / 2, y=it["y"] + (it["d"] - d) / 2,
+                      w=w, d=d, _equal_area=round(fill, 4))
+            n += 1
+        out.append(it)
+    return out, n
+
+
+def _resolve_overlaps(items: List[dict], passes: int = 8, min_dim: float = 0.6
+                      ) -> Tuple[List[dict], int, float]:
+    """
+    같은 층에서 겹친 이동 가능 요소(실·기기)를 겹침이 얕은 축 방향으로 반씩 잘라 떼어 놓는다.
+    고정 요소(장애물·void)와 겹치면 이동 가능 쪽만 자른다. 반환: (items, 겹친 쌍 수, 잘린 면적).
+    실제 평면에서만 생기는 문제다 — 합성 예제에는 겹침이 없어 아무것도 바뀌지 않는다.
+    """
+    items = [dict(it) for it in items]
+    movable = lambda it: it["kind"] in ("room", "equipment") and not it.get("unplaced")
+    solid = lambda it: it["kind"] in ("room", "equipment", "obstacle") and not it.get("unplaced")
+    area0 = sum(it["w"] * it["d"] for it in items if movable(it))
+    pairs = set()
+    by_floor: Dict[int, List[int]] = {}
+    for k, it in enumerate(items):
+        if solid(it):
+            by_floor.setdefault(it["floor"], []).append(k)
+    for _ in range(passes):
+        changed = False
+        for idx in by_floor.values():
+            for ia in range(len(idx)):
+                for ib in range(ia + 1, len(idx)):
+                    a, b = items[idx[ia]], items[idx[ib]]
+                    ox = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
+                    oy = min(a["y"] + a["d"], b["y"] + b["d"]) - max(a["y"], b["y"])
+                    if ox <= 1e-6 or oy <= 1e-6:
+                        continue
+                    ma, mb = movable(a), movable(b)
+                    if not (ma or mb):
+                        continue
+                    pairs.add((idx[ia], idx[ib]))
+                    share = (0.5, 0.5) if (ma and mb) else ((1.0, 0.0) if ma else (0.0, 1.0))
+                    if ox <= oy:      # 좌우로 떼기
+                        lo, hi = (a, b) if a["x"] + a["w"] / 2 <= b["x"] + b["w"] / 2 else (b, a)
+                        s_lo, s_hi = (share if lo is a else share[::-1])
+                        cut_lo, cut_hi = ox * s_lo, ox * s_hi
+                        if lo["w"] - cut_lo < min_dim or hi["w"] - cut_hi < min_dim:
+                            continue
+                        lo["w"] -= cut_lo
+                        hi["x"] += cut_hi; hi["w"] -= cut_hi
+                    else:             # 위아래로 떼기
+                        lo, hi = (a, b) if a["y"] + a["d"] / 2 <= b["y"] + b["d"] / 2 else (b, a)
+                        s_lo, s_hi = (share if lo is a else share[::-1])
+                        cut_lo, cut_hi = oy * s_lo, oy * s_hi
+                        if lo["d"] - cut_lo < min_dim or hi["d"] - cut_hi < min_dim:
+                            continue
+                        lo["d"] -= cut_lo
+                        hi["y"] += cut_hi; hi["d"] -= cut_hi
+                    changed = True
+        if not changed:
+            break
+    lost = area0 - sum(it["w"] * it["d"] for it in items if movable(it))
+    return items, len(pairs), lost
+
+
 def _gap(a: dict, b: dict) -> float:
     dx = max(0.0, max(a["x"], b["x"]) - min(a["x"] + a["w"], b["x"] + b["w"]))
     dy = max(0.0, max(a["y"], b["y"]) - min(a["y"] + a["d"], b["y"] + b["d"]))
@@ -179,6 +255,21 @@ def takeoff_to_ir(takeoffs: Sequence[dict], options: Optional[dict] = None
         if n_split:
             warns.append(f"가늘고 긴 실(복도로 판단) {n_split}개를 구간으로 나눴다 — 면적은 그대로, "
                          f"최적화가 동선 공간을 재배치할 수 있게. 복도를 그대로 두려면 해당 블록을 고정(pinned)할 것")
+
+    if o.get("irregular_shapes", "equal_area") == "equal_area":
+        items, n_irr = _equal_area_rects(items)
+        if n_irr:
+            warns.append(f"직사각형이 아닌 실·기기 {n_irr}개를 같은 면적의 직사각형(가로세로 비율 유지)으로 "
+                         f"바꿨다 — 외접 사각형을 쓰면 실들이 서로 겹쳐 현재 공간에 다시 들어가지 않는다. "
+                         f"외접 사각형을 쓰려면 options.irregular_shapes='bbox'")
+
+    if o.get("resolve_overlaps", True):
+        items, n_ov, lost = _resolve_overlaps(items)
+        if n_ov:
+            tot = sum(it["w"] * it["d"] for it in items if it["kind"] in ("room", "equipment"))
+            warns.append(f"현황에서 서로 겹친 실·기기 {n_ov}쌍(벽 두께·다각형 근사)을 맞닿은 면에서 반씩 잘라 "
+                         f"겹치지 않게 했다 — 잘린 면적 {lost:.1f} m² ({lost / max(tot, 1e-9) * 100:.1f}%). "
+                         f"그대로 두면 현황 배치를 출발점으로 쓸 때 겹친 실들이 연쇄적으로 밀려 외피가 부푼다")
 
     nf = max([it["floor"] for it in items] + list(bnd.keys()) + [0]) + 1
     project = o["project"] or ("현황 도면 최적화: " +
@@ -239,7 +330,10 @@ def takeoff_to_ir(takeoffs: Sequence[dict], options: Optional[dict] = None
         else:
             if o["keep_floors"] and not it.get("unplaced"):
                 b["floor"] = it["floor"]
-            if it.get("polygon") is not None and it.get("rect_fill", 1.0) < 0.85:
+            if it.get("_equal_area"):
+                b["_shape_note"] = (f"원형상은 직사각형이 아님(채움률 {it['_equal_area']:.0%}) "
+                                    f"— 같은 면적 직사각형으로 근사")
+            elif it.get("polygon") is not None and it.get("rect_fill", 1.0) < 0.85:
                 b["_shape_note"] = (f"원형상은 직사각형이 아님(채움률 {it['rect_fill']:.0%}) "
                                     f"— 외접 사각형으로 근사")
         if it.get("labels"):

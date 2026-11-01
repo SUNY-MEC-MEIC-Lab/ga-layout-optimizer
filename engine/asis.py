@@ -241,28 +241,44 @@ def warm_start(spec: G.Spec, asis: dict, seed: int = 0) -> G.Solution:
         rest = [i for i in ids if rect(i, f) is None]
         R = {i: rect(i, f) for i in known}
 
-        # 쌍마다 관계를 '하나만' 정한다 (대각 배치에서 양방향으로 다른 관계를 고르면 순환이 생긴다).
-        # 후보 4개(i←j 왼쪽, j←i 왼쪽, i 아래, j 아래) 중 간극이 가장 큰 것.
-        REL: Dict[Tuple[int, int], str] = {}
+        # Murata(1996) 의 SP 조건을 그대로 쓴다. 각 쌍에서 Γ⁺/Γ⁻ 가 '반드시' 지켜야 하는 순서만 간선으로 둔다.
+        #   좌우(세로 투영이 겹침)   : Γ⁺·Γ⁻ 모두 왼쪽이 앞
+        #   상하(가로 투영이 겹침)   : Γ⁺ 는 위가 앞, Γ⁻ 는 아래가 앞
+        #   좌하–우상 대각          : Γ⁻ 만 왼쪽이 앞 (Γ⁺ 는 자유 — 어느 쪽이든 기하적으로 참)
+        #   좌상–우하 대각          : Γ⁺ 만 왼쪽이 앞 (Γ⁻ 는 자유)
+        # 이렇게 만든 관계는 모두 현황 기하에서 참이므로, 디코딩(좌하단 압축) 좌표는 현황 좌표를
+        # 넘지 않는다 — 현황보다 큰 출발점이 나오지 않는다. (예전 방식은 쌍마다 '간극이 큰 축' 하나를
+        # 골라 순환이 생겼고, 실제 의료시설 평면(1개 층 150여 실)에서 외피가 52×66 → 73×74 m 로 부풀었다.)
+        EP, EM = set(), set()
+        eps = 1e-6
         for x in range(len(known)):
             for y in range(x + 1, len(known)):
                 i, j = known[x], known[y]
                 a, b = R[i], R[j]
-                cands = [(b[0] - a[2], "L", i, j), (a[0] - b[2], "L", j, i),
-                         (b[1] - a[3], "B", i, j), (a[1] - b[3], "B", j, i)]
-                g, kind, p_, q_ = max(cands, key=lambda c: (c[0], c[1] == "L"))
-                REL[(i, j)] = REL[(j, i)] = (kind, p_, q_)   # p_ 가 q_ 의 왼쪽/아래
-        key = lambda i: ((R[i][0] + R[i][2]) / 2 + (R[i][1] + R[i][3]) / 2, spec.blocks[i].id)
-
-        def before_p(a, b):          # Γ⁺: a 가 b 의 왼쪽, 또는 b 가 a 의 아래
-            kind, p_, q_ = REL[(a, b)]
-            return (kind == "L" and p_ == a) or (kind == "B" and p_ == b)
-
-        def before_m(a, b):          # Γ⁻: a 가 b 의 왼쪽 또는 아래
-            kind, p_, q_ = REL[(a, b)]
-            return p_ == a
-        s.gp[f] = _topo(known, before_p, key) + rest
-        s.gm[f] = _topo(known, before_m, key) + rest
+                xo = min(a[2], b[2]) - max(a[0], b[0])
+                yo = min(a[3], b[3]) - max(a[1], b[1])
+                cxi, cyi = (a[0] + a[2]) / 2, (a[1] + a[3]) / 2
+                cxj, cyj = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+                left, right = (i, j) if cxi <= cxj else (j, i)
+                low, up = (i, j) if cyi <= cyj else (j, i)
+                if xo > eps and yo > eps:         # 겹친 쌍 — 중심 차가 큰 축으로 본다
+                    horiz = abs(cxi - cxj) / max(a[2] - a[0] + b[2] - b[0], eps) >= \
+                            abs(cyi - cyj) / max(a[3] - a[1] + b[3] - b[1], eps)
+                    xo, yo = (0.0, 1.0) if horiz else (1.0, 0.0)
+                if yo > eps:                      # 좌우
+                    EP.add((left, right)); EM.add((left, right))
+                elif xo > eps:                    # 상하
+                    EP.add((up, low)); EM.add((low, up))
+                elif left == low:                 # 좌하–우상
+                    EM.add((left, right))
+                else:                             # 좌상–우하
+                    EP.add((left, right))
+        key_p = lambda i: ((R[i][0] + R[i][2]) / 2 - (R[i][1] + R[i][3]) / 2, spec.blocks[i].id)
+        key_m = lambda i: ((R[i][0] + R[i][2]) / 2 + (R[i][1] + R[i][3]) / 2, spec.blocks[i].id)
+        before_p = lambda a, b: (a, b) in EP
+        before_m = lambda a, b: (a, b) in EM
+        s.gp[f] = _topo(known, before_p, key_p) + rest
+        s.gm[f] = _topo(known, before_m, key_m) + rest
     return _fit_to_asis(s, a_sol, seed)
 
 

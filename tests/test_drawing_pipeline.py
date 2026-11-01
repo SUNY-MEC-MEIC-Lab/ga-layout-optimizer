@@ -164,6 +164,40 @@ class TestTakeoffToIR(unittest.TestCase):
         self.assertGreater(m1["footprint_m2"], 0)
 
 
+class TestWarmStart(unittest.TestCase):
+    """현황 배치 → Sequence-Pair 출발점이 현황보다 커지지 않는다 (Murata 조건)."""
+
+    @staticmethod
+    def _guillotine(rng, x, y, w, d, depth, out):
+        # 직사각형을 재귀적으로 잘라 빈틈 없는 실 배치를 만든다 (실제 평면처럼 빽빽하게).
+        if depth == 0 or (w < 6 and d < 6):
+            out.append((x, y, w, d)); return
+        if (w >= d and w >= 6) or d < 6:
+            c = rng.uniform(0.3, 0.7) * w
+            TestWarmStart._guillotine(rng, x, y, c, d, depth - 1, out)
+            TestWarmStart._guillotine(rng, x + c, y, w - c, d, depth - 1, out)
+        else:
+            c = rng.uniform(0.3, 0.7) * d
+            TestWarmStart._guillotine(rng, x, y, w, c, depth - 1, out)
+            TestWarmStart._guillotine(rng, x, y + c, w, d - c, depth - 1, out)
+
+    def test_dense_plan_does_not_grow(self):
+        for seed in range(6):
+            rng = random.Random(seed)
+            rects = []
+            self._guillotine(rng, 0.0, 0.0, 60.0, 40.0, 7, rects)
+            blocks = [B(f"R{k}", w=round(r[2], 4), d=round(r[3], 4), kind="room", rotatable=False)
+                      for k, r in enumerate(rects)]
+            sp, _ = spec(blocks, max_w=60.0, max_d=40.0)
+            asis = {"blocks": {f"R{k}": dict(x=r[0], y=r[1], w=round(r[2], 4), d=round(r[3], 4), floor=0)
+                               for k, r in enumerate(rects)}}
+            sol = ASIS.warm_start(sp, asis, seed)
+            sol.decode()
+            W, D, _ = sol.env
+            self.assertLessEqual(W, 60.0 + 0.01, f"seed {seed}: {len(rects)}실, 폭 {W:.2f} > 60")
+            self.assertLessEqual(D, 40.0 + 0.01, f"seed {seed}: {len(rects)}실, 깊이 {D:.2f} > 40")
+
+
 class TestTools(unittest.TestCase):
 
     def setUp(self):
