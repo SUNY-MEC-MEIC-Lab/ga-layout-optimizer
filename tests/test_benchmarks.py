@@ -145,25 +145,24 @@ class TestStage2Reproduction(unittest.TestCase):
 
     def test_ejeh2019_appendix_b(self):
         """
-        Ejeh 2019 부록 B 의 요소플랜트 8기기 전체 입력데이터가 공개되어 있다.
-        MILP 정식화 검증에 쓴다. 기대값: 4층 117,431 rmu.
+        Ejeh 2019 요소 플랜트(8기기) — 논문 목적함수(식 10) 그대로, 이 엔진의 표현·탐색으로 푼다.
+        ① 독립 검사로 실현가능 ② 전역 최적이 증명된 값보다 '낮으면' 비용식·조건 구현이 틀린 것 — 그래서 하한 검사
+        ③ 가용 층 1 → 4 로 늘리면 비용이 준다 (표 2 의 곡선 형상). 갭 자체는 보고만 한다.
         """
-        if not _has(EJEH):
-            self.skipTest(
-                f"Ejeh 2019 부록 B 데이터 없음. {EJEH} 에 넣을 것.\n"
-                f"  기대값: 1층 260,942 / 2층 167,299 / 3층 149,498 / 4층 117,431 rmu\n"
-                f"  ※ 이 엔진은 MILP 가 아니라 메타휴리스틱이므로 값이 아니라 "
-                f"'층수-비용 곡선의 형상' 을 대조한다.")
-        spec_path = os.path.join(EJEH, "spec.json")
-        sp = G.load_spec(spec_path)
-        import decompose
-        rows = decompose.floor_sweep(sp, [1, 2, 3, 4], iters=40000, restarts=3,
-                                     seed=20260826, verbose=True)
-        best = min(rows, key=lambda r: r["F"])
-        print(f"\n  Ejeh 2019 층수 스윕 최적 = {best['n_floors']}층")
-        self.assertLess(rows[-1]["F"], rows[0]["F"],
-                        "다층이 단층보다 나빠졌다 — 수직 비용 모형을 의심할 것")
-
+        path = os.path.join(EJEH, "ejeh2019_appendixB.json")
+        if not os.path.exists(path):
+            self.skipTest(f"Ejeh 2019 부록 B 데이터 없음: {path}")
+        import bench_ejeh as BE
+        res = {K: BE.run(path, "urea", [1, 2], iters=20000, restarts=2, K=K) for K in (1, 4)}
+        for K, r in res.items():
+            self.assertGreater(r["feasible"], 0, f"|K|={K}: 실현가능한 해가 없다 {r['runs']}")
+            best = min(x["total"] for x in r["runs"] if x["feasible"])
+            print(f"\n  Ejeh 요소 |K|={K}: 최선 {best:,.1f} · 논문 최적 {r['published']:,.1f} · 갭 {r['best_gap_pct']}%")
+            self.assertGreaterEqual(best, r["published"] - 0.5,
+                                    "증명된 최적보다 싸다 — 비용식이나 이격·경계 조건이 논문과 다르다")
+        b1 = min(x["total"] for x in res[1]["runs"] if x["feasible"])
+        b4 = min(x["total"] for x in res[4]["runs"] if x["feasible"])
+        self.assertLess(b4, b1, "가용 층을 늘렸는데 비용이 줄지 않았다 — 수직 비용 모형을 의심할 것")
 
 # ---------------------------------------------------------------------------
 # 음성 대조군
