@@ -13,13 +13,15 @@ program.py — 실 '규모 계획'(space programming)을 IR 에 결정론적으�
   "corridor": {"width_m": 1.83, "basis": "…"},          # 복도 폭을 이 값으로 (넓으면 줄이고, 좁으면 넓힌다)
   "optional_corridors": true,                            # 복도 구간을 솔버가 없앨 수 있게 (동선 제약이 기능을 지킨다)
   "stack_cores": true,                                   # 층마다 겹친 계단·엘리베이터를 하나의 수직 코어로
-  "unpin": ["CORE-*", "PR-*"]                            # 고정 해제 (fnmatch)
+  "unpin": ["CORE-*", "PR-*"],                           # 고정 해제 (fnmatch)
+  "exterior": [{"match": "Buero|Labor", "basis": "…"}]     # 외벽에 면해야 하는 실 (채광·구조대 진입창)
 }
 
 원칙
   · target 보다 큰 실은 target 까지 줄인다 (가로세로 비율 유지, 최소 치수 보장).
   · min 보다 작은 실은 min 까지 키운다 — 기능 미달을 숨기지 않는다.
   · 일치하는 규칙이 없는 실은 그대로 둔다 (인원·장비를 모르면 줄이지 않는다).
+  · grow_only 규칙은 최소 미달일 때 키우기만 한다 (최소 면적만 알려진 실 — 그보다 크면 그대로).
   · 모든 변경은 블록의 _program 에 근거와 함께 남고, 보고서로 돌려준다.
 """
 from __future__ import annotations
@@ -36,11 +38,17 @@ CIRC_RX = [
     ("lobby", re.compile(r"LOBBY|Foyer|Eingang|WAITING|^\s*WAIT\b|RECEPT|로비|현관|대기실", re.I)),
 ]
 
+CORRIDOR_FIRST = re.compile(r"Flur|CORRIDOR|복도", re.I)
+
 
 def circulation_of(name: str, kind: str) -> Optional[str]:
     """실 이름 → 동선 종류. 모르면 None (추정하지 않는다)."""
     if kind not in ("room", "opening", "obstacle"):
         return None
+    # "Flur Keller Treppe"(계단 앞 복도) 처럼 복도 이름에 계단이 붙은 공간은 복도다 —
+    # 계단 자체는 그 안의 계단 객체(IfcStair)다. 계단으로 치면 실 문이 계단실로 나는 배치가 허용된다.
+    if CORRIDOR_FIRST.search(name or ""):
+        return "corridor"
     for t, rx in CIRC_RX:
         if rx.search(name or ""):
             return t
@@ -160,6 +168,7 @@ def apply_program(ir: dict, prog: dict, tol: float = 0.05) -> List[str]:
     # ---- 계단 중복 제거 (IfcStair 객체가 계단실 IfcSpace 안에 또 있다) ----------------
     asis_b = (prog.get("_asis") or {}).get("blocks", {})
     if asis_b:
+        rep += _cut_stairs_from_halls(blocks, asis_b)
         stairs = [b for b in blocks if b.get("circulation") == "stair" and b["id"] in asis_b]
         drop = set()
         for b in stairs:
@@ -208,6 +217,17 @@ def apply_program(ir: dict, prog: dict, tol: float = 0.05) -> List[str]:
         if n:
             rep.append(f"복도 구간 {n}개를 '없앨 수 있음' 으로 — 실 출입·동선 연결·피난 제약이 필요한 만큼만 남긴다")
 
+    # ---- 외벽에 면해야 하는 실 (채광·구조대 진입창·급배기) -------------------------
+    for ex in prog.get("exterior") or []:
+        rx = re.compile(ex["match"], re.I)
+        fl = ex.get("floors")          # 층 제한 (예: 지하는 채광 창이 없다 → [1, 2, 3])
+        hit = [b for b in blocks if not b.get("circulation") and rx.search(f"{b.get('name', '')} {b['id']}")
+               and (fl is None or b.get("floor") in fl)]
+        for b in hit:
+            b["need_exterior"] = True
+        if hit:
+            rep.append(f"외벽 접면 {len(hit)}개 ({ex['match']}) — {ex.get('basis', '')}")
+
     # ---- 실 규모 ---------------------------------------------------------------
     rules = [(r, re.compile(r["match"], re.I)) for r in prog.get("rooms") or []]
     shrunk = grown = 0
@@ -223,7 +243,7 @@ def apply_program(ir: dict, prog: dict, tol: float = 0.05) -> List[str]:
             mn = r.get("min_area_m2")
             mcd = r.get("min_clear_dim_m")
             new = None
-            if tgt and a0 > tgt * (1 + tol):
+            if tgt and a0 > tgt * (1 + tol) and not r.get("grow_only"):
                 new = tgt; shrunk += 1
             elif mn and a0 < mn * (1 - tol):
                 new = mn; grown += 1
@@ -240,6 +260,47 @@ def apply_program(ir: dict, prog: dict, tol: float = 0.05) -> List[str]:
         rep.append(f"실 규모 조정: 축소 {shrunk}개 · 확대 {grown}개 · 순변화 {d_area:+.1f} m² "
                    f"(규칙 없는 실은 그대로 — 인원·장비를 모르면 줄이지 않는다)")
     ir.setdefault("_program_report", []).extend(rep)
+    return rep
+
+
+def _cut_stairs_from_halls(blocks, asis_b) -> List[str]:
+    """
+    계단 객체가 복도·로비 공간 안에 놓여 있으면(계단 앞 복도 안의 계단), 그 공간에서 계단이 차지한
+    끝부분을 잘라 낸다 — 계단은 계단 블록, 나머지는 복도 블록으로 겹치지 않게.
+    계단이 공간의 한쪽 끝을 폭 전체로 차지할 때만 자른다(직사각형이 유지되는 경우).
+    """
+    rep = []
+    stairs = [b for b in blocks if b.get("circulation") == "stair" and b["id"] in asis_b]
+    halls = [b for b in blocks if b.get("circulation") in ("corridor", "lobby") and b["id"] in asis_b]
+    eps = 0.05
+    for s in stairs:
+        a = asis_b[s["id"]]
+        for h in halls:
+            c = asis_b[h["id"]]
+            if c["floor"] != a["floor"]:
+                continue
+            inside = (a["x"] >= c["x"] - eps and a["y"] >= c["y"] - eps and
+                      a["x"] + a["w"] <= c["x"] + c["w"] + eps and a["y"] + a["d"] <= c["y"] + c["d"] + eps)
+            if not inside:
+                continue
+            cut = None
+            if abs(a["w"] - c["w"]) <= eps:                     # 폭 전체 — 아래/위 끝
+                if abs(a["y"] - c["y"]) <= eps:
+                    cut = dict(y=a["y"] + a["d"], d=c["d"] - a["d"])
+                elif abs(a["y"] + a["d"] - c["y"] - c["d"]) <= eps:
+                    cut = dict(d=c["d"] - a["d"])
+            elif abs(a["d"] - c["d"]) <= eps:                   # 깊이 전체 — 왼/오른 끝
+                if abs(a["x"] - c["x"]) <= eps:
+                    cut = dict(x=a["x"] + a["w"], w=c["w"] - a["w"])
+                elif abs(a["x"] + a["w"] - c["x"] - c["w"]) <= eps:
+                    cut = dict(w=c["w"] - a["w"])
+            if cut is None or min(cut.get("w", c["w"]), cut.get("d", c["d"])) < 0.5:
+                continue
+            c.update({k: round(v, 4) for k, v in cut.items()})
+            h["w"], h["d"] = c["w"], c["d"]
+            h["_program"] = f"계단({s['id']}) 이 차지한 부분을 잘라 낸 계단 앞 복도"
+            rep.append(f"{h['id']} {h.get('name', '')}: 안의 계단 {s['id']} 부분을 잘라 복도 {c['w']:.1f}×{c['d']:.1f} m 로")
+            break
     return rep
 
 

@@ -44,8 +44,10 @@ IR 에는 이렇게 적는다.
 
 | ID | 이름 | 유형 | 근거 | 파라미터 |
 |---|---|---|---|---|
-| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access`, `direct`, `through_ok`, `corridor_for` |
+| `ADJACENT` | 인접 — 붙어 있어야 하는 실 / 붙으면 안 되는 실 | hard | 기능상 직접 이어져야 하는 실(수술실↔멸균 코어, 검체 화장실↔검사실, 엘리베이터↔복도)과 직접 이어지면 안 되는 실(오염실↔청결 구역). 규칙마다 근거를 why 에 적는다. | `rules`*, `touch_tol_m` |
+| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access`, `direct`, `through_ok`, `corridor_for`, `no_through`, `no_entry_types`, `entry_ok` |
 | `CIRC-CONNECT` | 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다 | hard | 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 Table 1020.3 복도 44 in = 1.118 m, ASR A1.8 표 2). | `min_width_m`*, `touch_tol_m`, `circulation_types`, `must_include` |
+| `DEAD-END` | 막다른 복도 길이 | hard | IBC 2021 §1020.5 — 막다른 복도 20 ft(6.1 m), B·E·F·I-1·M·R-1·R-2·S·U 용도 스프링클러 시 50 ft(15.24 m). 복도 구간을 없애면 막다른 복도가 길어질 수 있다. | `max_m`*, `min_width_m`*, `touch_tol_m`, `exit_types` |
 | `EGRESS` | 피난 — 계단까지 거리·계단 수·계단 간 이격 | hard | IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다. | `max_travel_m`*, `exit_types`, `min_exits`, `exit_separation_frac`, `applies_to`, `exempt`, `ground_floor` |
 | `ELEC-SEP` | 전기계통 물리적 분리 | hard | GDC 17 + RG 1.75 Rev.3. ★ 현행 RG 1.75 Rev.3 본문에는 수치 이격거리가 전혀 없다. IEEE Std 384-1992 채택 시 원문이 1981년판 대비 "특정 형상에 대해 이격거리 기준이 축소되었다"고 명시했다. | `groups`*, `min_horizontal_m`*, `citation`*, `barrier_pairs` |
 | `FIRE-20FT` | 화재방호 계열 분리 (App. R III.G.2) | hard | 10 CFR 50 Appendix R III.G.2 — 고온정지 1계열 무손상: ①3시간 내화방벽 ②수평 20 ft(6.096 m) 초과 + 개재 가연물 0 + 감지·자동소화 ③1시간 방벽 + 감지·자동소화 중 하나. | `groups`*, `min_horizontal_m`, `gap_metric`, `combustible_free`*, `detection_and_suppression`*, `barrier_pairs` |
@@ -60,6 +62,29 @@ IR 에는 이렇게 적는다.
 | `VITAL-AREA` | 중요구역(vital area) 집약 및 2중 방벽 | hard | 10 CFR 73.55(e)(9) — "중요기기는 vital area 안에만 위치해야 하며, 접근에 최소 2중의 물리적 방벽 통과를 요구해야 한다". (f) target set 분석이 VA 경계를 역으로 결정한다. | `vital_blocks`*, `max_areas`*, `barrier_standoff_m`, `penalty_m_per_extra_area` |
 
 `*` 표시는 필수 파라미터 — 값이 null 이면 Gate 1 에서 ERROR.
+
+---
+
+## `ADJACENT` — 인접 — 붙어 있어야 하는 실 / 붙으면 안 되는 실
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> 기능상 직접 이어져야 하는 실(수술실↔멸균 코어, 검체 화장실↔검사실, 엘리베이터↔복도)과 직접 이어지면 안 되는 실(오염실↔청결 구역). 규칙마다 근거를 why 에 적는다.
+
+**수식**
+
+```
+mode=must: ∀ a: ∃ b 같은 층, 맞닿은 길이 ≥ min_touch ; mode=must_not: ∀ a,b: 맞닿은 길이 = 0
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `rules` | list | ★ | — | [{a: 실 정규식, b: 실 정규식, mode: must/must_not, min_touch_m, max_gap_m, why}] — max_gap_m 을 주면 맞닿음 대신 간극 ≤ max_gap 이면 된다. — 정규식은 이름+id 에 맞춘다. 'circ:corridor/lobby' 처럼 동선 종류로도 지정. |
+| `touch_tol_m` | m |  | `0.35` | 벽 두께. |
 
 ---
 
@@ -90,6 +115,9 @@ IR 에는 이렇게 적는다.
 | `direct` | regex |  | — | 복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨). |
 | `through_ok` | regex |  | — | 다른 실이 '거쳐 지나가도' 되는 실 이름. 정하면 그 외의 실(멸균 코어 등)은 통로로 못 쓴다. |
 | `corridor_for` | pairs |  | — | [[실 이름 정규식, 복도 이름 정규식], …] — 그 실은 그 복도로만 드나든다 (청결/오염 동선 분리). |
+| `no_through` | regex |  | — | 다른 실이 '거쳐 지나가면 안 되는' 실 이름 (예: 화장실·창고·기계실·전기실 — IBC 2021 §1016.2). |
+| `no_entry_types` | types |  | `[]` | 실 문을 낼 수 없는 동선 종류 (예: ['stair','elevator'] — 피난계단실 개구부 제한, IBC 2021 §1023.4). 동선 연결·피난에는 그대로 쓴다. |
+| `entry_ok` | regex |  | — | no_entry_types 로도 문을 낼 수 있는 실 이름 (예: 평상시 재실하는 사무실). |
 
 ---
 
@@ -118,6 +146,31 @@ IR 에는 이렇게 적는다.
 
 ---
 
+## `DEAD-END` — 막다른 복도 길이
+
+**유형** hard · **기본 가중치** 2000
+
+**근거**
+
+> IBC 2021 §1020.5 — 막다른 복도 20 ft(6.1 m), B·E·F·I-1·M·R-1·R-2·S·U 용도 스프링클러 시 50 ft(15.24 m). 복도 구간을 없애면 막다른 복도가 길어질 수 있다.
+
+**수식**
+
+```
+한쪽 끝만 동선망에 이어진 복도 사슬의 길이(블록 긴 변의 합) ≤ max_m — 출구에 닿는 사슬은 제외
+```
+
+**파라미터**
+
+| 이름 | 단위 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `max_m` | m | ★ | — | 인용 필수. |
+| `min_width_m` | m | ★ | — | 이어진 것으로 보는 맞닿은 길이 = 복도 최소 폭. |
+| `touch_tol_m` | m |  | `0.35` | 벽 두께. |
+| `exit_types` | types |  | `['stair']` | 닿으면 막다른 곳이 아닌 동선 종류. |
+
+---
+
 ## `EGRESS` — 피난 — 계단까지 거리·계단 수·계단 간 이격
 
 **유형** hard · **기본 가중치** 2000
@@ -142,7 +195,7 @@ IR 에는 이렇게 적는다.
 | `exit_separation_frac` | ratio |  | — | 계단 간 최소 거리 / 층 대각선 (IBC 1007.1.1: 1/3 스프링클러, 1/2 비스프링클러). |
 | `applies_to` | kinds |  | `['room', 'equipment']` |  |
 | `exempt` | regex |  | — | 상주 인원이 없는 실(옥탑 기계실 등) — 피난 거리·출구 수 검사에서 뺀다. |
-| `ground_floor` | index |  | `0` | 피난층(0 부터). 위층 계단은 이 층까지 끊김 없이 이어져야 한다. |
+| `ground_floor` | index |  | `0` | 피난층(0 부터). 위층·지하층 계단은 이 층까지 끊김 없이 이어져야 한다. |
 
 ---
 

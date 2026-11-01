@@ -1,0 +1,656 @@
+{
+  "case": "hospital_or",
+  "summary_ko": "병원 수술부는 '구역(zone)'으로 짜인 공간이다. 환자·보호자가 다니는 일반 구역, 수술복을 입은 직원만 다니는 준제한 구역(청결 복도·스크럽·창고), 그리고 준제한 구역을 통해서만 들어가는 제한 구역(수술실·멸균물품 코어)이 있다. 그래서 '각 실이 복도에 붙어 있으면 된다'로는 부족하다. 수술실은 반드시 청결 복도에서 바로 들어가야 하고 멸균 코어와도 직접 붙어 있어야 한다. 오염 처리실은 수술실·멸균 코어와 직접 이어지면 안 되고, 회복실(PACU)은 수술실 가까이에 두어 일반 병원 복도를 지나지 않고 들어갈 수 있어야 한다. 침대 이동로(2.44 m 복도, 1.054 m 문)도 필요하다. 미국 I-2 용도라 층마다 연기 방화구획이 최소 2개 있어야 하고(구획당 22,500 sf 이하, 방화문까지 200 ft 이하), 막다른 복도는 20 ft 이하로 제한된다. 현재 모델에는 계단·출구 블록이 없어서, 피난 검사를 하려면 출구 위치부터 정해야 한다.",
+  "requirements": [
+    {
+      "id": "R1",
+      "what_ko": "수술실(OR-1~6)은 청결 복도(CORR-N)에 '직접' 붙어 있어야 한다. 다른 실(수술 전 대기실·스크럽 이외의 실)을 거쳐 들어가면 안 된다.",
+      "why_ko": "환자 침대와 직원이 다른 방을 지나 수술실에 들어가면 무균 구역이 깨지고, 실제로 '수술 전 대기실을 거쳐서만 들어가는 수술실' 같은 쓸 수 없는 배치가 나온다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "door_m": 1.054,
+        "via_rooms": 1,
+        "direct": "수술실",
+        "circulation_types": [
+          "corridor"
+        ],
+        "through_ok": "SCRUB|스크럽"
+      },
+      "targets": "RM013,RM014,RM015,RM016,RM018,RM019 (이름 정규식 'OR-[0-9]|수술실 [0-9]')",
+      "source": {
+        "title": "VA PG-18-9 Space Planning Criteria, Ch.286 Surgical/Endovascular Services (2023-02-01)",
+        "section": "8.F.4, 8.A.6.c",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Access to the ORs shall be provided from the semi-restricted corridor for patient and staff and from the Clean Core Area for access to equipment and supplies."
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "이미 있음 (direct=수술실). 근거를 VA 원문으로 보강."
+    },
+    {
+      "id": "R2",
+      "what_ko": "모든 수술실은 멸균물품 코어(CORE)와 벽을 맞대고 문 폭 이상 접해야 한다 (코어에서 수술실로 직접 물품 공급).",
+      "why_ko": "멸균 물품이 청결 복도나 다른 실을 거쳐 수술실로 가면 오염 위험이 커지고 '코어 주변에 수술실을 묶는' 설계 의도가 사라진다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "a": "수술실 [0-9]",
+        "b": "CORE|멸균물품",
+        "min_contact_m": 1.054,
+        "touch_tol_m": 0.5
+      },
+      "targets": "OR-1~6 ↔ RM008 CORE",
+      "source": {
+        "title": "VA PG-18-9 Ch.286",
+        "section": "8.G.1–8.G.2",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Direct access from the ORs shall be provided. ... Operating Rooms shall be designed around the clean core area to separate clean from soiled supplies"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (현재는 CORE 를 CORR-N 으로만 드나들게 할 뿐, 수술실과 붙어 있는지는 검사 안 함)"
+    },
+    {
+      "id": "R3",
+      "what_ko": "멸균물품 코어는 통로로 쓰지 않고, 수술실 2~8개를 묶는 한 덩어리(pod)여야 한다. 코어는 청결 복도와 수술실에서만 드나든다.",
+      "why_ko": "코어는 수술부에서 가장 깨끗한 곳이라 수술복 입은 직원만 들어간다. 지나가는 길이 되면 무균 상태를 유지할 수 없다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "through_ok": "SCRUB|스크럽",
+        "corridor_for": [
+          [
+            "CORE|멸균",
+            "CORR-N|청결복도"
+          ]
+        ],
+        "pod_max_or_per_core": 8,
+        "pod_min_or_per_core": 2
+      },
+      "targets": "RM008 CORE",
+      "source": {
+        "title": "VA PG-18-9 Ch.286",
+        "section": "2 Definitions 'Clean Core'; 8.G.1; FA7 CS231",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Only staff wearing appropriate surgical attire shall be permitted in the Clean Core. ... A Clean Core Area shall serve a minimum of two and a maximum of eight ORs"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "through_ok·corridor_for 는 이미 있음. pod 2~8개 상한은 새로 추가 (현재 6개라 통과)."
+    },
+    {
+      "id": "R4",
+      "what_ko": "오염 처리실(SOIL)은 수술실·멸균 코어·청결 창고와 직접 이어지면 안 된다 (벽을 맞대고 문이 나는 배치 금지). 일반 복도(CORR-S)로만 드나든다.",
+      "why_ko": "쓰고 난 기구·폐기물이 무균 구역으로 바로 들어오면 교차오염이 생긴다.",
+      "rule": "SEP",
+      "params": {
+        "separations": [
+          {
+            "a": "RM011",
+            "b": "RM008",
+            "min_dist": 0.6
+          },
+          {
+            "a": "RM011",
+            "b": "RM010",
+            "min_dist": 0.6
+          },
+          {
+            "a": "RM011",
+            "b": "OR-* (RM013..RM019 각각)",
+            "min_dist": 0.6
+          }
+        ],
+        "note": "min_dist 0.6 m 는 CIRC-ACCESS touch_tol 0.5 m 보다 커서 '맞닿음(문 가능)'을 막는 모델링 값. 문 없는 공유벽까지 막으므로 보수적이다."
+      },
+      "targets": "RM011 SOIL ↔ RM008 CORE, RM010 CLEAN, RM013–RM016, RM018, RM019",
+      "source": {
+        "title": "Oregon Admin. Rules OAR 333-535-0110 Surgical Facilities (hospital)",
+        "section": "(4)(f)",
+        "url": "https://www.law.cornell.edu/regulations/oregon/Or-Admin-Code-SS-333-535-0110",
+        "quote": "Soiled utility or holding areas shall not have direct connection with operating rooms or other sterile activities"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (corridor_for 로 SOIL→CORR-S 는 이미 있음; SOIL–멸균실 직접 맞닿음은 검사 안 함)"
+    },
+    {
+      "id": "R5",
+      "what_ko": "회복실(PACU)은 수술실 가까이 두고, 수술부 안(청결 복도 CORR-N)에서 바로 들어갈 수 있어야 한다. 수술 직후 환자가 일반 복도를 지나지 않게.",
+      "why_ko": "마취에서 깨는 중인 환자를 통제되지 않은 병원 복도로 옮기면 감염·안전 위험이 크고 이송 시간이 길어진다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_for": [
+          [
+            "PACU|회복실",
+            "CORR-N|청결복도"
+          ]
+        ],
+        "direct": "수술실|PACU|회복실"
+      },
+      "targets": "RM002 PACU",
+      "source": {
+        "title": "OAR 333-535-0110 (4)(u)(D); VA PG-18-9 Ch.286 8.H.1",
+        "section": "(4)(u)(D); 8.H.1",
+        "url": "https://www.law.cornell.edu/regulations/oregon/Or-Admin-Code-SS-333-535-0110",
+        "quote": "VA: The PACU should be located in close proximity to the operating rooms and adjacent to Pre-operative Holding / Phase II Recovery. (Oregon: 회복실 문 중 최소 하나는 통제되지 않은 병원 복도를 거치지 않고 수술부에서 바로 열릴 것 — WebFetch 요약)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (현재 PACU 는 출입 규칙 없음 — 어느 복도든 통과)"
+    },
+    {
+      "id": "R6",
+      "what_ko": "수술 전 대기실(PREOP)과 회복실(PACU)은 벽을 맞대고 이어져야 한다 (같은 간호 인력이 함께 운영).",
+      "why_ko": "떨어져 있으면 간호 인력이 나뉘고 환자 이동 거리가 늘어난다. VA 는 두 공간을 합쳐 쓰기도 한다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "a": "PREOP",
+        "b": "PACU",
+        "min_contact_m": 1.054,
+        "touch_tol_m": 0.5
+      },
+      "targets": "RM001 PREOP ↔ RM002 PACU",
+      "source": {
+        "title": "VA PG-18-9 Ch.286",
+        "section": "8.H.1",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "The PACU should be located in close proximity to the operating rooms and adjacent to Pre-operative Holding / Phase II Recovery"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "새로 추가 ('should' — 권고. hard 대신 큰 가중치 soft 도 가능)"
+    },
+    {
+      "id": "R7",
+      "what_ko": "침대 이동 경로가 있어야 한다: PREOP → 수술실, 수술실 → PACU 가 복도만으로(통로 폭 2.44 m 이상, 문 1.054 m 이상) 이어져야 한다. 일반 복도와 청결 복도는 통제 지점(문) 한 곳 이상에서 침대 폭으로 연결되어야 한다.",
+      "why_ko": "두 복도를 일부러 나눈 설계라 CIRC-CONNECT 를 쓰지 않는데, 그러면 환자를 수술실로 옮길 길이 아예 없는 배치도 통과한다.",
+      "rule": "NEW:ROUTE",
+      "params": {
+        "routes": [
+          {
+            "from": "PREOP",
+            "to": "수술실 [0-9]",
+            "via_types": [
+              "corridor"
+            ]
+          },
+          {
+            "from": "수술실 [0-9]",
+            "to": "PACU",
+            "via_types": [
+              "corridor"
+            ]
+          }
+        ],
+        "min_width_m": 2.44,
+        "door_m": 1.054,
+        "forbid_via": "CORE|멸균|SOIL|오염|CSSD|STORE|CLEAN"
+      },
+      "targets": "RM001, RM002, OR-1~6, RM006 CORR-S, RM012 CORR-N",
+      "source": {
+        "title": "IBC 2021 §1010.1.1 (Illinois 2021 adoption on UpCodes) + Table 1020.3; VA PG-18-9 8.A.11",
+        "section": "1010.1.1; 8.A.11",
+        "url": "https://up.codes/s/size-of-doors",
+        "quote": "where used for the movement of beds shall provide a minimum clear opening width of 41 1/2 inches (1054 mm). / VA: Patient corridors shall be a minimum dimension of 8'0\" clear"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (폭 값은 이미 쓰고 있으나 '경로가 존재하는가'는 검사 안 함)"
+    },
+    {
+      "id": "R8",
+      "what_ko": "수술부(준제한·제한 구역)는 다른 곳으로 가는 사람이 지나가는 길이 되면 안 된다. 일반 구역 실(PREOP·LOUNGE·LOCKER 등)에서 출구로 가는 길이 청결 복도를 거치면 안 된다.",
+      "why_ko": "외부인이 수술부를 가로지르면 무균 통제가 무너지고, 피난 시에도 수술 중인 공간으로 사람이 몰린다.",
+      "rule": "NEW:NO-THROUGH-ZONE",
+      "params": {
+        "zone": "CORR-N|청결복도|수술실|CORE|SCRUB|ANES|CSSD|CLEAN",
+        "from_kinds_regex": "PREOP|LOUNGE|LOCKER|STORE|SOIL|CORR-S",
+        "to": "exits"
+      },
+      "targets": "RM012 CORR-N 및 STERILE/SEMI 그룹",
+      "source": {
+        "title": "OAR 333-535-0110 (1); IBC 2021 §407.4.4.1 (Illinois 2021, UpCodes)",
+        "section": "(1); 407.4.4.1",
+        "url": "https://up.codes/viewer/illinois/ibc-2021/chapter/4/special-detailed-requirements-based-on-occupancy-and-use",
+        "quote": "Oregon: The surgical suite shall be located and arranged to prevent non-related traffic through the suite. / IBC 407.4.4.1: 다른 부분의 피난 접근로는 care suite 를 지나면 안 됨(요약)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R9",
+      "what_ko": "직원 탈의실(LOCKER)은 일반 복도와 청결 복도 양쪽에 붙어, 밖에서 들어온 직원이 갈아입고 곧바로 수술부로 들어가는 '관문' 역할을 해야 한다.",
+      "why_ko": "탈의실이 한쪽에만 붙으면 평상복 직원이 청결 복도를 다니거나 수술복 직원이 일반 구역을 돌아 들어가게 된다.",
+      "rule": "NEW:BRIDGE",
+      "params": {
+        "block": "LOCKER|탈의실",
+        "must_touch": [
+          "CORR-S|일반복도",
+          "CORR-N|청결복도"
+        ],
+        "min_contact_m": 0.813
+      },
+      "targets": "RM004 LOCKER",
+      "source": {
+        "title": "OAR 333-535-0110",
+        "section": "(4)(m)",
+        "url": "https://www.law.cornell.edu/regulations/oregon/Or-Admin-Code-SS-333-535-0110",
+        "quote": "(WebFetch 요약) 전신마취·침습 시술 수술부에서는 외부에서 들어오는 직원이 갈아입고 수술부로 바로 들어갈 수 있게 배치할 것"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가 (원문 문장은 요약으로만 확인 — 'should' 수준)"
+    },
+    {
+      "id": "R10",
+      "what_ko": "스크럽(손 씻기)은 수술실 입구 바로 옆, 청결 복도 쪽에 있어야 한다. 한 곳을 이웃한 수술실 두 개가 함께 쓸 수 있다 — 즉 스크럽 하나가 담당할 수 있는 수술실은 최대 2개, 그 수술실들과 맞닿거나 아주 가까워야 한다.",
+      "why_ko": "손을 씻은 뒤 먼 거리를 걸어가면 다시 오염된다. 현재 스크럽 2개로 수술실 6개를 맡아 기준(수술실당 1개 또는 2실 공용)을 못 맞출 수 있다.",
+      "rule": "NEW:SERVED-BY",
+      "params": {
+        "clients": "수술실 [0-9]",
+        "servers": "SCRUB|스크럽",
+        "max_gap_m": 0.5,
+        "max_clients_per_server": 2,
+        "server_must_touch": "CORR-N|청결복도"
+      },
+      "targets": "OR-1~6 ↔ RM017, RM020",
+      "source": {
+        "title": "Michigan Admin. Code R 325.45277(d)(ii); VA PG-18-9 Ch.286 8.F.10; VA Design Guide App. C p.34",
+        "section": "R 325.45277(d)(ii); 8.F.10",
+        "url": "https://www.law.cornell.edu/regulations/michigan/Mich-Admin-Code-R-325-45277",
+        "quote": "One scrub sink with a gooseneck outlet must be provided near the entrance to each operating room. A scrub sink with two positions may be shared between two adjacent operating rooms"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "새로 추가. 현재 블록 수(스크럽 2 / 수술실 6)로는 위반 — 스크럽 블록 추가 또는 '복도 안 알코브'로 처리할지 소유자 결정 필요"
+    },
+    {
+      "id": "R11",
+      "what_ko": "중앙공급실(CSSD)은 멸균 코어와 붙어 있어 멸균 물품이 코어로 바로 들어가야 하고, 사용한 기구 반입은 오염 쪽(일반 복도·오염 처리실)으로 받는다.",
+      "why_ko": "멸균품이 일반 복도를 지나 코어로 가거나, 오염 기구가 코어를 지나 CSSD 로 가면 청결/오염 흐름이 섞인다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "a": "CSSD|중앙공급",
+        "b": "CORE|멸균물품",
+        "min_contact_m": 1.054,
+        "plus_link": {
+          "a": "CSSD",
+          "b": "SOIL",
+          "kind": "route",
+          "cost": "가중치 — 가정"
+        }
+      },
+      "targets": "RM009 CSSD ↔ RM008 CORE (및 RM011 SOIL 근접)",
+      "source": {
+        "title": "VA PG-18-9 Ch.286",
+        "section": "9 Functional Relationship Matrix (SP Svc Decontamination/Sterilization = 1 High); 8.A.8",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Separate the flow of clean medical supplies, instruments, and linen from soiled and unused materials to prevent cross-contamination."
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가 (VA 표는 '관계 높음'만 줌 — '맞닿음'은 이 해석)"
+    },
+    {
+      "id": "R12",
+      "what_ko": "층마다 연기 방화구획(smoke compartment)을 2개 이상 두어야 한다. 구획 하나는 22,500 sf(2,090 m²) 이하, 구획 안 어디서든 방화구획 문까지 200 ft(61 m) 이하. 각 구획은 이웃 구획 인원을 받아줄 피난 공간(침대·이동식 침대 환자 1명당 30 sf=2.8 m², 기타 1명당 6 sf=0.56 m²)이 있어야 한다.",
+      "why_ko": "병원 환자는 스스로 계단으로 대피하지 못한다. 불이 나면 같은 층의 옆 구획으로 침대째 옮기는 '수평 대피'를 하는데, 구획이 하나뿐이면 갈 곳이 없다.",
+      "rule": "NEW:SMOKE-COMPARTMENT",
+      "params": {
+        "min_compartments_per_floor": 2,
+        "max_compartment_area_m2": 2090.3,
+        "max_travel_to_barrier_door_m": 61.0,
+        "refuge_m2_per_bed_patient": 2.79,
+        "refuge_m2_per_other": 0.56,
+        "barrier_crosses": "corridor (침대 폭 문 필요)"
+      },
+      "targets": "층 전체 (f0). 현 외곽 60.3×34.3 = 2,068 m² 로 22,500 sf 바로 아래",
+      "source": {
+        "title": "IBC 2021 §407.5, 407.5.1, 407.5.2, 407.5.3 (Illinois 2021 adoption, UpCodes)",
+        "section": "407.5–407.5.3",
+        "url": "https://up.codes/viewer/illinois/ibc-2021/chapter/4/special-detailed-requirements-based-on-occupancy-and-use",
+        "quote": "(요약) every story used for care, treatment or sleeping → at least two smoke compartments; ≤22,500 sf; travel to a smoke barrier door ≤200 ft; refuge 30 net sf per bed/stretcher care recipient, 6 sf per other"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가. 엔진에 구획선 개념이 없음 — 블록에 smoke_zone 을 붙이고 구획선이 복도를 가로지르는지 검사해야 함"
+    },
+    {
+      "id": "R13",
+      "what_ko": "피난: 어느 실에서든 출구(계단 또는 수평출구)까지 200 ft(61 m) 이하, 층당 출구 2개 이상, 출구 간 거리 ≥ 대각선의 1/3 (스프링클러).",
+      "why_ko": "출구까지 멀거나 출구가 한쪽에 몰리면 화재 때 다른 출구로 피할 수 없다.",
+      "rule": "EGRESS",
+      "params": {
+        "max_travel_m": 61.0,
+        "min_exits": 2,
+        "exit_separation_frac": 0.333,
+        "exit_types": [
+          "stair"
+        ]
+      },
+      "targets": "모든 실. ★현재 블록 목록에 계단·출구가 없음",
+      "source": {
+        "title": "IBC 2021 Table 1017.2 (I-2: 비스프링클러 NP / 스프링클러 200 ft) + §1007.1.1",
+        "section": "Table 1017.2",
+        "url": "https://gocodebook.com/library/us/ca/ca-building-code/chapter-10-means-of-egress/section-1017-exit-access-travel-distance",
+        "quote": "(검색 요약: Florida 개정안·CA 조문 모두 I-2 = NP / 200 ft)"
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "새로 추가 (현재 hospital_or 에 EGRESS 없음). 계단/출구 블록을 먼저 넣어야 적용 가능"
+    },
+    {
+      "id": "R14",
+      "what_ko": "막다른 복도(한쪽 끝이 막힌 복도 구간)는 20 ft(6.1 m) 이하. 환자 실을 안 거치는 직원 복도만 30 ft(9.1 m)까지. 폭의 2.5배보다 짧으면 제한 없음.",
+      "why_ko": "막다른 곳으로 피난한 사람(특히 침대 환자)은 되돌아 나와야 해서 연기에 갇힌다. 복도를 줄이다 보면 긴 막다른 구간이 생기기 쉽다.",
+      "rule": "NEW:DEAD-END",
+      "params": {
+        "max_dead_end_m": 6.096,
+        "max_dead_end_staff_only_m": 9.144,
+        "exempt_if_len_lt_width_x": 2.5,
+        "staff_only_corridor": "(소유자 지정)"
+      },
+      "targets": "RM006 CORR-S, RM012 CORR-N",
+      "source": {
+        "title": "IBC 2021 §1020.5 Dead ends (Illinois 2021, UpCodes)",
+        "section": "1020.5 + Exception (I-2 Condition 2)",
+        "url": "https://up.codes/s/dead-ends",
+        "quote": "dead-end corridors do not exceed 20 feet (6096 mm) in length ... (I-2) shall not exceed 30 feet (9144 mm)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R15",
+      "what_ko": "수술부를 'care suite'(진료 스위트)로 보면: 스위트 안 어디서든 스위트 출입문(복도 쪽)까지 100 ft(30.5 m) 이하, 수면실 없는 스위트 면적 12,500 sf(1,161 m²) 이하(전체 연기감지 시 15,000 sf=1,394 m²), 2,500 sf(232 m²) 초과면 출입문 2개 이상. 스위트는 연기칸막이로 나머지와 분리.",
+      "why_ko": "수술실이 복도에 '직접' 붙지 않는 대신 스위트로 묶을 때의 조건이다. 스위트가 너무 크거나 문이 하나뿐이면 피난이 막힌다.",
+      "rule": "NEW:CARE-SUITE",
+      "params": {
+        "suite_members": "CORR-N|수술실|SCRUB|CORE|ANES|CSSD|CLEAN",
+        "max_travel_to_suite_door_m": 30.48,
+        "max_area_m2": 1161.3,
+        "max_area_with_smoke_detection_m2": 1393.5,
+        "two_doors_if_area_over_m2": 232.3
+      },
+      "targets": "준제한·제한 구역 블록 묶음",
+      "source": {
+        "title": "IBC 2021 §407.4.1, 407.4.4.2, 407.4.4.3, 407.4.4.6 (Illinois 2021, UpCodes)",
+        "section": "407.4.4",
+        "url": "https://up.codes/viewer/illinois/ibc-2021/chapter/4/special-detailed-requirements-based-on-occupancy-and-use",
+        "quote": "(요약) travel within the suite to that door ≤100 ft; suites without sleeping rooms ≤12,500 sf (15,000 sf with smoke detection); >2,500 sf → two exit access doors"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "새로 추가. 수치는 원문 확인, '수술부 = care suite' 적용 여부는 관할 판단(가정)"
+    },
+    {
+      "id": "R16",
+      "what_ko": "병원 I-2 의 '사람이 머무는 실'(PREOP·PACU·LOUNGE 등)은 복도로 바로 나가는 문이 있어야 한다 (care suite 안의 실은 예외).",
+      "why_ko": "환자가 있는 실에서 다른 실을 지나야 복도로 나간다면 대피가 늦어진다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "direct": "수술실|PREOP|PACU|LOUNGE|휴게"
+      },
+      "targets": "RM001, RM002, RM003",
+      "source": {
+        "title": "IBC 2021 §407.4.1 (Illinois 2021, UpCodes)",
+        "section": "407.4.1",
+        "url": "https://up.codes/viewer/illinois/ibc-2021/chapter/4/special-detailed-requirements-based-on-occupancy-and-use",
+        "quote": "(요약) Habitable rooms must have an exit access door leading directly to a corridor, except rooms opening directly outside at ground level and care suites per 407.4.4"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "값 변경 (direct 정규식 확대)"
+    },
+    {
+      "id": "R17",
+      "what_ko": "장비 창고(STORE)·청결 창고(CLEAN)·마취 준비(ANES)는 준제한 구역 지원실이므로 청결 복도(CORR-N)에서 드나든다. 이동식 장비·이동식 침대 보관 공간이 따로 있어 복도 폭을 잡아먹지 않아야 한다.",
+      "why_ko": "장비를 복도에 세워 두면 침대 이동 폭(2.44 m)이 사라진다. 창고가 일반 복도에 붙으면 청결 물품이 일반 구역을 지난다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_for": [
+          [
+            "STORE|장비 창고|CLEAN|청결 창고|ANES|마취",
+            "CORR-N|청결복도"
+          ]
+        ]
+      },
+      "targets": "RM005, RM007, RM010",
+      "source": {
+        "title": "VA PG-18-9 Ch.286 8.A.6.b; OAR 333-535-0110 (4)(o)",
+        "section": "8.A.6.b; (4)(o)",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Semi-restricted areas include peripheral support areas that surround the restricted area such as scrub stations, storage areas for clean and sterile supplies and medical equipment, as well as corridors leading to the restricted area."
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "값 변경 (STORE 를 corridor_for 청결 쪽에 추가; CLEAN·ANES 는 이미 있음)"
+    },
+    {
+      "id": "R18",
+      "what_ko": "오염 처리실은 수술실에서 너무 멀면 안 된다 — 수술실 문에서 180 ft(54.9 m) 이내.",
+      "why_ko": "멀면 오염 기구를 복도에 오래 끌고 다니게 되어 교차오염과 혼잡이 생긴다.",
+      "rule": "NEW:MAX-DIST",
+      "params": {
+        "from": "수술실 [0-9]",
+        "to": "SOIL|오염",
+        "max_dist_m": 54.9,
+        "metric": "manhattan"
+      },
+      "targets": "OR-1~6 → RM011",
+      "source": {
+        "title": "OAR 333-535-0110",
+        "section": "(4)(f)",
+        "url": "https://www.law.cornell.edu/regulations/oregon/Or-Admin-Code-SS-333-535-0110",
+        "quote": "(WebFetch 요약) 오염실까지 이동 거리는 실 6개 또는 180 ft 이내"
+      },
+      "status": "secondary",
+      "priority": "low",
+      "changes_today": "새로 추가 (현 외곽 60 m 라 대부분 통과 — 원문에서 어느 실 기준 거리인지 재확인 필요)"
+    },
+    {
+      "id": "R19",
+      "what_ko": "청결 복도 폭은 8 ft(2.44 m) 이상, 멸균 코어 폭(짧은 변)은 20 ft(6.1 m) 이상 권장.",
+      "why_ko": "청결 복도는 침대·장비·스크럽 알코브가 함께 쓰는 길이고, 코어가 좁으면 카트를 돌릴 수 없다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_width_m": 2.44,
+        "core_min_clear_dim_m": 6.1
+      },
+      "targets": "RM012 CORR-N, RM008 CORE",
+      "source": {
+        "title": "VA Surgical & Endovascular Services Design Guide, Appendix C Space Design Standards (2023-05-04 R)",
+        "section": "p.5 Lessons Learned, p.10, typical OR layouts",
+        "url": "https://www.cfm.va.gov/til/dGuide/dgSurgAppendixC.pdf",
+        "quote": "RECOMMENDED MINIMUM CLEAN CORE WIDTH OF 20'-0\" ... SEMI-RESTRICTED CORRIDOR 8'-0\" CLEAR WIDTH"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "복도 폭 이미 있음 (IBC 96 in). 코어 최소 치수는 room_sizes 로 새로 추가"
+    },
+    {
+      "id": "R20",
+      "what_ko": "수술부로 들어오는 모든 사람을 볼 수 있는 통제 지점(control station)이 일반 구역→준제한 구역 전환부에 있어야 한다.",
+      "why_ko": "통제 지점이 없으면 수술복을 입지 않은 사람이 청결 구역에 들어가도 막을 수 없다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "a": "CONTROL (블록 없음 — 추가 필요)",
+        "b": [
+          "CORR-S|일반복도",
+          "CORR-N|청결복도"
+        ]
+      },
+      "targets": "(블록 없음)",
+      "source": {
+        "title": "OAR 333-535-0110 (4)(a); VA PG-18-9 Ch.286 FA7 CS139",
+        "section": "(4)(a); CS139",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Locate this space to allow visual observation of all traffic coming into the semi-restricted"
+      },
+      "status": "verified",
+      "priority": "low",
+      "changes_today": "새로 추가 (도면에 블록이 없어 우선 open question)"
+    }
+  ],
+  "room_sizes": [
+    {
+      "match": "수술실 [0-9]$",
+      "min_area_m2": 37.16,
+      "min_clear_dim_m": 6.1,
+      "basis": "Michigan R 325.45277(d)(i) / Oregon OAR 333-535-0110(3)(a)(B) (FGI 계열 주 규정): 수술실 순바닥 400 sf, 최소 치수 20 ft (고정 수납 제외). VA 계획값은 일반 수술실 650 NSF(60.4 m²) — 목표값으로만 참고",
+      "url": "https://www.law.cornell.edu/regulations/michigan/Mich-Admin-Code-R-325-45277",
+      "status": "verified"
+    },
+    {
+      "match": "하이브리드",
+      "min_area_m2": 55.74,
+      "min_clear_dim_m": 6.1,
+      "basis": "FGI 2018 OP 공식 해석(영상유도 수술실: 600 sf, 최소 치수 20 ft) — 외래 지침 해석이라 병원 하이브리드 수술실 적용은 2차. VA 계획값 Hybrid OR 900 NSF(83.7 m²)",
+      "url": "https://www.fgiguidelines.org/wp-content/uploads/2019/02/FGI-interps_Guidelines_2018_OP_190123.pdf",
+      "status": "secondary"
+    },
+    {
+      "match": "CORE|멸균물품",
+      "min_clear_dim_m": 6.1,
+      "target_area_m2": 184.0,
+      "basis": "VA Design Guide App. C: 코어 폭 20 ft 권장 / VA PG-18-9 CS231: 660 NSF + 수술실 2개 초과분 1개당 330 NSF → 6실 = 1,980 NSF(184 m²)",
+      "url": "https://www.cfm.va.gov/til/dGuide/dgSurgAppendixC.pdf",
+      "status": "verified"
+    },
+    {
+      "match": "PACU|회복실",
+      "min_area_m2": 112.4,
+      "basis": "VA PG-18-9 CS241: PACU 병상 110 NSF × (3 + 2×(수술실−2)) = 6실 → 11병상 = 1,210 NSF(112.4 m²) — VA 프로그램 값(법정 최소 아님). FGI 2014 2.2-3.3.4.3: 병상당 80 sf(7.43 m²) 순면적(2차 자료), Oregon (4)(u)(B): 병상 간 5 ft, 병상–벽 4 ft. 병상 수는 소유자 확인 필요",
+      "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+      "status": "secondary"
+    },
+    {
+      "match": "PREOP|수술 전",
+      "basis": "VA PG-18-9 SC291: 병상 140 NSF × (5 + 3×(수술실−2)) → 6실 = 17병상(221 m²) — VA 프로그램 값. 현 133 m² 보다 크므로 VA 기준 채택 여부는 소유자 판단. 최소값은 넣지 않음",
+      "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+      "status": "secondary"
+    },
+    {
+      "match": "SCRUB|스크럽",
+      "min_area_m2": 1.86,
+      "basis": "VA PG-18-9 SC199: 스크럽 알코브 수술실 1개당 20 NSF",
+      "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+      "status": "verified"
+    },
+    {
+      "match": "SOIL|오염",
+      "min_area_m2": 9.29,
+      "basis": "VA PG-18-9 SB743 수술부 Soiled Utility Room 100 NSF (VA 프로그램 값)",
+      "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+      "status": "secondary"
+    }
+  ],
+  "new_rule_types": [
+    {
+      "name": "ADJACENT-REQUIRED",
+      "semantics_ko": "a 정규식에 맞는 각 블록이 b 정규식의 블록 하나 이상과 같은 층에서 간극 ≤ touch_tol 이고 겹치는 변 길이 ≥ min_contact_m 인지 검사. 위반량 = Σ max(0, min_contact − 맞닿은 길이) [m].",
+      "params": {
+        "a": "블록 이름 정규식",
+        "b": "블록 이름 정규식 또는 목록(목록이면 모두와 맞닿아야 함)",
+        "min_contact_m": "문 순폭 (인용)",
+        "touch_tol_m": "벽 두께"
+      }
+    },
+    {
+      "name": "ROUTE",
+      "semantics_ko": "from 블록에서 to 블록까지 '동선 블록만' 지나는 경로가 있는지: 그래프 노드 = from·to·circulation(via_types) 블록, 간선 = 맞닿은 길이 ≥ door_m(실–복도) 또는 ≥ min_width_m(복도–복도). forbid_via 블록은 노드에서 제외. 경로가 없는 (from,to) 쌍마다 위반 1건.",
+      "params": {
+        "routes": "[{from, to, via_types}]",
+        "min_width_m": "복도 간 연결 폭",
+        "door_m": "실–복도 문 폭",
+        "forbid_via": "통과 금지 정규식"
+      }
+    },
+    {
+      "name": "NO-THROUGH-ZONE",
+      "semantics_ko": "from 블록에서 출구(EGRESS exit_types)까지 최단 동선 경로를 구할 때, zone 정규식 블록을 지나지 않는 경로가 있어야 한다. 없으면 위반 1건(또는 zone 안 경로 길이 m).",
+      "params": {
+        "zone": "통과 금지 구역 정규식",
+        "from_kinds_regex": "출발 실",
+        "to": "exits"
+      }
+    },
+    {
+      "name": "BRIDGE",
+      "semantics_ko": "block 이 must_touch 의 각 정규식 블록과 모두 min_contact_m 이상 맞닿는지 (관문실: 탈의실 등). 위반량 = 못 닿은 쪽의 부족 길이 합.",
+      "params": {
+        "block": "정규식",
+        "must_touch": "정규식 목록",
+        "min_contact_m": "문 폭"
+      }
+    },
+    {
+      "name": "SERVED-BY",
+      "semantics_ko": "clients 각 블록에서 servers 블록 하나 이상까지 외곽 간극 ≤ max_gap_m; server 하나에 배정되는 client 는 max_clients_per_server 이하(이분 매칭); server 는 server_must_touch 복도와 맞닿을 것.",
+      "params": {
+        "clients": "정규식",
+        "servers": "정규식",
+        "max_gap_m": "m",
+        "max_clients_per_server": "개",
+        "server_must_touch": "정규식"
+      }
+    },
+    {
+      "name": "SMOKE-COMPARTMENT",
+      "semantics_ko": "블록에 smoke_zone 라벨(또는 층을 나누는 직선 구획선 x=c / y=c 를 결정변수로)을 두고: 층당 구획 수 ≥ 2, 구획별 외곽 bbox 면적 ≤ max_area, 구획선이 지나는 곳에 복도 블록이 걸쳐(구획 문) 있을 것, 각 실 중심→가장 가까운 구획 문 직교거리 ≤ max_travel, 각 구획의 복도+실 면적(refuge 인정 실) ≥ 이웃 구획 인원×단위면적. 구획선이 실을 가로지르면 위반.",
+      "params": {
+        "min_compartments_per_floor": "개",
+        "max_compartment_area_m2": "m²",
+        "max_travel_to_barrier_door_m": "m",
+        "refuge_m2_per_bed_patient": "m²/인",
+        "refuge_m2_per_other": "m²/인"
+      }
+    },
+    {
+      "name": "DEAD-END",
+      "semantics_ko": "층의 동선 블록 그래프에서 출구(계단·외부 출입문·구획 문)로 이어지는 '두 갈래 이상' 경로가 없는 끝단 구간의 길이(복도 축 방향 거리)를 잰다. 길이 > max_dead_end 이고 길이 ≥ exempt_if_len_lt_width_x × 복도 폭이면 초과분 m 를 위반량으로.",
+      "params": {
+        "max_dead_end_m": "m",
+        "exempt_if_len_lt_width_x": "배수"
+      }
+    },
+    {
+      "name": "CARE-SUITE",
+      "semantics_ko": "suite_members 블록 합 면적 ≤ max_area; 스위트 경계에서 비스위트 복도와 맞닿는 '스위트 문' 수 ≥ (면적>임계 ? 2 : 1); 스위트 안 각 실 중심→가장 가까운 스위트 문 직교거리 ≤ max_travel.",
+      "params": {
+        "suite_members": "정규식",
+        "max_area_m2": "m²",
+        "max_travel_to_suite_door_m": "m",
+        "two_doors_if_area_over_m2": "m²"
+      }
+    },
+    {
+      "name": "MAX-DIST",
+      "semantics_ko": "from 각 블록 중심에서 to 블록 중심까지 거리(metric) ≤ max_dist_m. 위반량 = 초과 m.",
+      "params": {
+        "from": "정규식",
+        "to": "정규식",
+        "max_dist_m": "m",
+        "metric": "manhattan|euclid"
+      }
+    }
+  ],
+  "not_layout_related": [
+    "수술실 환기 횟수·양압 관계(ASHRAE 170, VA App. C 압력 다이어그램) — 공조 설계",
+    "수술실 바닥 마감(일체형 레진 바닥, 바닥 배수구 금지 — VA 8.F.9)",
+    "스크럽 싱크의 무릎/발 조작 수전, 구즈넥 꼭지",
+    "연기 방화벽·연기칸막이의 내화 성능(IBC 709·710), 문 자동 닫힘",
+    "의료가스·비상전원(NFPA 99), 스프링클러 설비 자체",
+    "PACU 간호사 시야 확보(창·유리 칸막이 위치) — 블록 배치로는 '같은 실 안'까지만 표현"
+  ],
+  "open_questions": [
+    "이 수술부 층의 출구는 어디인가? 블록 목록에 계단·엘리베이터·외부 출구가 없어 EGRESS·DEAD-END·연기구획 검사를 할 수 없다. 계단/침대용 엘리베이터 위치(또는 외곽 접면 출구)를 알려 달라.",
+    "이 층은 수술부만 있는 층인가, 더 큰 병원 층의 일부인가? I-2 는 층마다 연기구획이 2개 이상이어야 하는데, 이 60×34 m 판이 한 구획인지 두 구획으로 나뉘어야 하는지는 층 전체를 알아야 판단된다.",
+    "수술부(청결 복도+수술실+코어)를 IBC 407.4.4 'care suite' 로 계획했는가? 그렇다면 R15, 아니라면 모든 수술실이 '피난용 복도'에 직접 면해야 하는지 관할 확인 필요.",
+    "스크럽 공간: 현재 2블록으로 6실을 담당. 수술실마다(또는 2실 공용) 청결 복도 쪽 알코브를 둘 것인가, 블록을 추가할 것인가?",
+    "PACU·PREOP 병상 수(수술실 6실 기준). VA 공식이면 PACU 11, PREOP 17 이지만 VA 기준을 쓸지 소유자 결정.",
+    "통제 지점(control station)·환자 전용 침대 엘리베이터·청결/오염 엘리베이터가 필요한가 (CSSD 가 다른 층이면 필수)?",
+    "직원 전용 복도로 지정할 구간(막다른 복도 30 ft 예외 적용 대상)이 있는가?"
+  ]
+}

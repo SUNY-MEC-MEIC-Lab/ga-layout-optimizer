@@ -106,6 +106,19 @@ button{font:inherit;color:inherit}
 .facts div{font-size:13px;color:var(--mut)}
 .facts div b{display:block;font-size:17px;font-weight:500;color:var(--fg);font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:2px}
 .facts div b small{color:var(--mut);font-size:12.5px;font-weight:400;margin-left:3px}
+.picks{margin:4px 0 22px}
+.picks h4{font-size:13px;font-weight:600;color:var(--mut);margin:0 0 4px;letter-spacing:.02em}
+.picks p.hint{font-size:13.5px;color:var(--mut);margin:0 0 12px}
+.picks .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.pick{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);transition:border-color .15s,box-shadow .15s}
+.pick:hover{border-color:var(--mut2)}
+.pick:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.pick[aria-pressed="true"]{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset;background:var(--acc-soft)}
+.pick b{display:block;font-size:15px;font-weight:600;margin-bottom:2px}
+.pick .w{display:block;font-size:12.5px;color:var(--mut);line-height:1.5;margin-bottom:8px}
+.pick dl{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin:0;font-size:13px}
+.pick dt{color:var(--mut)} .pick dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.pick .bad{color:var(--bad)} .pick .good{color:var(--good)}
 .verdict{padding:18px 0 0 24px;border-left:2px solid var(--line);min-height:100%}
 .verdict.ok{border-left-color:var(--good)} .verdict.no{border-left-color:var(--warn)}
 .verdict .tag{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:8px}
@@ -178,6 +191,18 @@ button{font:inherit;color:inherit}
 .cmp td small{display:block;color:var(--mut);font-size:12.5px;white-space:normal}
 .cmp td .lbl{font-weight:600;display:block}
 .cmp td .sub{color:var(--mut);font-size:12.5px}
+.rs-sum{color:var(--mut);font-size:14.5px;max-width:72ch;margin:0 0 14px}
+.rs-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px 36px}
+@media (max-width:820px){.rs-cols{grid-template-columns:1fr}}
+.rs-cols h4{font-size:13px;font-weight:600;color:var(--mut);margin:6px 0 2px}
+.rs-list{list-style:none;margin:0;padding:0}
+.rs-list li{padding:10px 0;border-bottom:1px solid var(--line2);font-size:14px;line-height:1.6}
+.rs-list li b{font-weight:600}
+.rs-list li .w{display:block;color:var(--mut);font-size:13px}
+.rs-list li .s{display:block;font-size:12.5px;color:var(--mut2);margin-top:2px}
+.st{display:inline-block;font-size:11px;border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:2px;border:1px solid currentColor}
+.st.verified{color:var(--good)} .st.secondary{color:var(--acc)} .st.assumed{color:var(--warn)}
+.rs-note{font-size:13.5px;color:var(--mut);border-left:2px solid var(--warn);padding-left:12px;margin:12px 0 0}
 .reqs{list-style:none;margin:0;padding:0}
 .reqs li{padding:11px 0;border-bottom:1px solid var(--line2);font-size:14px;line-height:1.6}
 .reqs li b{display:block;font-weight:600}
@@ -322,6 +347,8 @@ details.more li b{color:var(--fg);font-weight:600}
       <div class="verdict" id="verdict"></div>
     </section>
 
+    <section class="picks" id="picks" hidden></section>
+
     <section class="stage" id="stage">
       <div class="toolbar">
         <label class="sw"><input type="checkbox" id="c-model" checked><span>실제 모양으로 보기</span></label>
@@ -365,6 +392,11 @@ details.more li b{color:var(--fg);font-weight:600}
     <section class="sec ev">
       <div class="sec-h"><h3>이번에 지킨 기능 요건</h3><p>면적만 줄인 이전 실행과 견주어 봅니다.</p></div>
       <div class="evidence" id="func"></div>
+    </section>
+
+    <section class="sec ev" id="rs-sec" hidden>
+      <div class="sec-h"><h3>LLM이 찾아 넣은 기준</h3><p>공개된 법령·설계 지침을 조사해 근거와 함께 정리했습니다. 엔진이 검사할 수 있는 것은 제약으로 넣었고, 아직 검사하지 못하는 것도 숨기지 않고 적었습니다.</p></div>
+      <div id="rs"></div>
     </section>
 
     <details class="viol ev" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
@@ -435,7 +467,7 @@ import { classify, TYPES, buildModel } from "./models.js";
 
 const CASES = window.GA_CASES || [];
 // 실제 도면에는 구역·계열 정보가 없다 — 모형 종류(진료실·사무실·화장실 …)로 색을 나눈다.
-for (const c of CASES) if (c.real) for (const L of [c.asis, c.optimized]) for (const b of L.blocks) b.group = "t:" + classify(b);
+for (const c of CASES) if (c.real) for (const L of [c.asis, c.optimized, ...(c.candidates || []).map(k => k.layout)]) for (const b of L.blocks) b.group = "t:" + classify(b);
 const LABELS = {
   smr_aux: {
     "FZ-A": "안전설비 A계열", "FZ-B": "안전설비 B계열 (A와 떨어져야 함)",
@@ -806,9 +838,12 @@ const REQ_NAME = {
   "CIRC-CONNECT": "층마다 복도·계단이 하나로 이어져야 함",
   "EGRESS": "계단까지 피난 거리·계단 수·계단 간격",
   "RACK-SERVE": "설비는 배관대(또는 크레인) 가까이, 배관대는 끊기지 않게",
+  "ADJACENT": "붙어 있어야 하는 실 / 붙으면 안 되는 실",
+  "DEAD-END": "막다른 복도 길이 제한",
 };
 const VIOL_NAME = {
-  ENVELOPE: "현재 건물 외곽 안에 들어가야 함", EXTERIOR: "외벽에 붙어야 하는 설비", SEP: "안전 이격 거리",
+  ENVELOPE: "현재 건물 외곽 안에 들어가야 함", EXTERIOR: "외벽에 붙어야 하는 실·설비", SEP: "안전 이격 거리",
+  ADJACENT: "붙어 있어야(붙으면 안 되는) 실", "DEAD-END": "막다른 복도 길이",
   CRANE: "천장 크레인 범위", ELEV: "중력 구동 높이차", FIXED: "고정 위치", "LOAD-PATH": "중량물 운반 경로",
   "FIRE-20FT": "화재 계열 분리", "FIRE-HATCH": "해치 화재구역", "TALL-EQUIP": "층 관통 기기 정렬",
   "VITAL-AREA": "보안 중요구역", "FREE-AREA": "작업 공지", "TURBINE-25": "터빈 미사일 구역",
@@ -827,6 +862,7 @@ function show(i) {
   $("src").innerHTML = c.real
     ? `출처: ${esc(c.source)} · <a href="${esc(c.source_url)}">${esc(c.source_url.replace("https://", ""))}</a> · ${esc(c.license)}${c.changes ? `<br>변경: ${esc(c.changes)}` : ""}`
     : "";
+  renderPicks(c);
   const a = c.asis, o = c.optimized;
   const red = c.footprint_reduction_pct;
   const ok = o.hard === 0 && !c.asis_better && red > 0;
@@ -843,6 +879,7 @@ function show(i) {
   $("withheld").hidden = geo;
   $("withheld").innerHTML = geo ? "" : `이 모델은 라이선스를 확인하지 못해 3D 형상은 싣지 않고 결과 수치만 보여 줍니다. (${esc(c.license || "")})`;
   renderFunc(c);
+  renderResearch(c);
   const vd = $("verdict");
   vd.className = "verdict " + (ok ? "ok" : "no");
   const linkX = a.link > 0 ? o.link / a.link : 1;
@@ -874,6 +911,40 @@ function show(i) {
   renderAll();
 }
 
+function renderPicks(c) {
+  const el = $("picks");
+  const cs = c.candidates || [];
+  el.hidden = cs.length < 2;
+  if (cs.length < 2) { el.innerHTML = ""; return; }
+  const sel = c._pick || 0;
+  const pctS = x => `${x > 0 ? "−" : "+"}${Math.abs(x).toFixed(1)}%`;
+  el.innerHTML = `<h4>후보안 ${cs.length}개 — 직접 고르세요</h4>
+    <p class="hint">모두 같은 기능 요건을 지킨 안입니다. 무엇을 더 중요하게 볼지는 사람이 정할 일이라, 엔진은 하나만 고르지 않고 성격이 다른 안을 나란히 보여 줍니다. 누르면 오른쪽 3D와 수치가 그 안으로 바뀝니다.</p>
+    <div class="row">${cs.map((k, i) => `<button class="pick" data-k="${i}" aria-pressed="${i === sel}">
+      <b>${esc(k.label)}</b><span class="w">${esc(k.why)}</span>
+      <dl><dt>바닥 면적</dt><dd>${fmt(k.layout.footprint)} m² <small>(${pctS(k.pct)})</small></dd>
+      <dt>연결 길이</dt><dd>${fmt(k.layout.link)}${c.asis.link ? ` <small>(현황 ${(k.layout.link / c.asis.link).toFixed(2)}배)</small>` : ""}</dd>
+      ${k.moved_m != null ? `<dt>실 평균 이동</dt><dd>${k.moved_m.toFixed(1)} m</dd>` : ""}
+      <dt>규칙 위반</dt><dd class="${k.layout.hard ? "bad" : "good"}">${k.layout.hard ? k.layout.hard + "곳" : "없음"}</dd></dl>
+    </button>`).join("")}</div>`;
+  el.querySelectorAll(".pick").forEach(btn => btn.onclick = () => {
+    const k = +btn.dataset.k;
+    if (k === (c._pick || 0)) return;
+    choose(c, k);
+    show(current); frame(c);
+  });
+}
+
+function choose(c, k) {
+  const cand = c.candidates[k];
+  c._pick = k;
+  c.optimized = cand.layout;
+  c.footprint_reduction_pct = cand.pct;
+  c.asis_better = cand.asis_better;
+  c.result_sha256 = cand.result_sha256;
+  if (cand.layout.removed) c.removed = cand.layout.removed;
+}
+
 function renderFunc(c) {
   const p = c.previous_area_only, o = c.optimized, a = c.asis;
   const pct = x => (x == null ? "—" : `${x > 0 ? "−" : "+"}${Math.abs(x).toFixed(1)}%`);
@@ -902,6 +973,26 @@ function renderFunc(c) {
       ${prog ? `<details class="more"><summary>기준에 맞춰 바꾼 것 (실 규모·코어·복도 폭)</summary><ul>${prog}</ul></details>` : ""}
       ${src ? `<details class="more"><summary>근거 문서</summary><ul>${src}</ul></details>` : ""}
     </div>`;
+}
+
+const ST_NAME = { verified: "원문 확인", secondary: "2차 자료", assumed: "가정" };
+function renderResearch(c) {
+  const R = c.research;
+  $("rs-sec").hidden = !R;
+  if (!R) return;
+  const item = x => {
+    const st = ST_NAME[x.status] ? `<span class="st ${x.status}">${ST_NAME[x.status]}</span>` : "";
+    const src = x.source && (x.source.title || x.source.url)
+      ? `<span class="s">${esc([x.source.title, x.source.section].filter(Boolean).join(" · "))}${x.source.url ? ` · <a href="${esc(x.source.url)}" rel="noopener">원문</a>` : ""}</span>` : "";
+    return `<li><b>${esc(x.what)}</b>${st}<span class="w">${esc(x.why)}</span>${src}</li>`;
+  };
+  const on = R.items.filter(x => x.applied), off = R.items.filter(x => !x.applied);
+  $("rs").innerHTML = `<p class="rs-sum">${esc(R.summary)}</p>
+    <div class="rs-cols">
+      <div><h4>엔진에 넣어 검사한 기준 ${on.length}개</h4><ul class="rs-list">${on.map(item).join("")}</ul></div>
+      <div><h4>아직 엔진이 검사하지 못하는 기준 ${off.length}개</h4><ul class="rs-list">${off.map(item).join("")}</ul></div>
+    </div>
+    ${R.note ? `<p class="rs-note">${esc(R.note)}</p>` : ""}`;
 }
 
 // ---- 변형 애니메이션: 오른쪽 화면에서 현황 배치 → 최적화 배치 ----

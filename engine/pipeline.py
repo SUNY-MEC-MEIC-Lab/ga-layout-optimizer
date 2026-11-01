@@ -15,6 +15,7 @@ import time
 from typing import Callable, Dict, List, Optional
 
 import asis as ASIS
+import candidates as CAND
 import drawing
 import ga_core as G
 import irhash
@@ -54,6 +55,7 @@ def optimize_ir(ir: dict, out: str, *, mode: str = "sa", effort: str = "normal",
                 iters: Optional[int] = None, restarts: Optional[int] = None,
                 pop: int = 60, gens: int = 60, seed: int = 20260826,
                 asis: Optional[dict] = None, pick: Optional[int] = None,
+                n_candidates: int = 0,
                 progress: Optional[Callable[[str, float], None]] = None) -> dict:
     """
     반환 summary (JSON 직렬화 가능). 산출물은 out/ 에 쓴다.
@@ -105,8 +107,17 @@ def optimize_ir(ir: dict, out: str, *, mode: str = "sa", effort: str = "normal",
         if asis is not None and asis.get("blocks"):
             init = ASIS.warm_start(spec, asis, seed)      # 첫 재시작은 현황 배치에서 출발
             manifest["warm_start"] = "asis"
-        best, Fo, _ = G.optimize(spec, iters=p["iters"], restarts=p["restarts"],
-                                 seed=seed, verbose=False, tick=tick, init=init)
+        if n_candidates:
+            # 후보안 여러 개 — 사람이 고른다 (candidates.py). 첫 번째가 목적함수 최소 = 대표 결과.
+            a_sol0 = ASIS.AsIsSolution(spec, asis) if (asis is not None and asis.get("blocks")) else None
+            cands = CAND.generate(spec, iters=p["iters"], restarts=p["restarts"], seed=seed,
+                                  init=init, asis_sol=a_sol0, k=n_candidates, tick=tick)
+            best, Fo = cands[0]["sol"], cands[0]["F"]
+            manifest["candidates"] = len(cands)
+        else:
+            cands = None
+            best, Fo, _ = G.optimize(spec, iters=p["iters"], restarts=p["restarts"],
+                                     seed=seed, verbose=False, tick=tick, init=init)
     elif mode == "nsga":
         say(f"NSGA-II pop {pop} × gen {gens}", 0.05)
         front, _pop = nsga.nsga2(spec, pop_size=pop, generations=gens, seed=seed)
@@ -128,6 +139,17 @@ def optimize_ir(ir: dict, out: str, *, mode: str = "sa", effort: str = "normal",
     res_hash = irhash.sha256_obj(payload)
     with open(os.path.join(out, "result.json"), "w", encoding="utf-8") as fp:
         json.dump(payload, fp, ensure_ascii=False, indent=2)
+    cand_rows = None
+    if mode == "sa" and n_candidates:
+        cand_rows = []
+        for c in cands:
+            m = ASIS.metrics(spec, c["sol"])
+            pl = result_payload(spec, c["sol"])
+            cand_rows.append(dict(key=c.get("key"), label=c.get("label"), why=c.get("why"),
+                                  profile=c["profile"], metrics=m, moved_m=c.get("moved_m"),
+                                  result_sha256=irhash.sha256_obj(pl), result=pl))
+        with open(os.path.join(out, "candidates.json"), "w", encoding="utf-8") as fp:
+            json.dump(cand_rows, fp, ensure_ascii=False, indent=2)
 
     # ---- 현황(도면) 비교 -------------------------------------------------------
     asis_m = cmp_ = None
@@ -165,6 +187,7 @@ def optimize_ir(ir: dict, out: str, *, mode: str = "sa", effort: str = "normal",
         asis=asis_m, comparison=cmp_, asis_clearance_overlaps=asis_overlaps[:50],
         hard_violation_count=opt_m["hard_violation_count"],
         pareto=pareto_rows,
+        candidates=[{k: v for k, v in c.items() if k != "result"} for c in cand_rows] if cand_rows else None,
         gate1_warnings=rep.WARN,
         outputs=sorted(os.path.basename(x) for x in paths) + ["result.json", "run_manifest.json",
                                                               "report.html"],

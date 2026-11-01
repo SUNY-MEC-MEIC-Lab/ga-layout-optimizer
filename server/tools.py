@@ -552,6 +552,9 @@ class Tools:
                     raise ToolError(f"program 규칙 '{r.get('type')}' 에 근거(basis)가 없다 — 인용 없는 수치는 받지 않는다")
             if (prog.get("corridor") or {}).get("width_m") and not prog["corridor"].get("basis"):
                 raise ToolError("program.corridor 에 근거(basis)가 없다")
+            for r in prog.get("exterior") or []:
+                if not r.get("basis"):
+                    raise ToolError(f"program.exterior '{r.get('match')}' 에 근거(basis)가 없다")
             asis_new = copy.deepcopy(asis) if asis is not None else None
             prog["_asis"] = asis_new
             changes += ["program: " + x for x in PROGRAM.apply_program(ir, prog)]

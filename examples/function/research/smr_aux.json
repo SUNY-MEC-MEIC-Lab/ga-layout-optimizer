@@ -1,0 +1,700 @@
+{
+  "case": "smr_aux",
+  "summary_ko": "원전 보조건물은 면적을 줄여도 다섯 가지 일을 해야 한다. (1) 사람이 두 방향 이상으로 피난하고, (2) 안전계열 A·B 중 하나에 불·침수가 나도 다른 하나가 살아 있고, (3) 방사선관리구역은 출입통제실(RCA) 한 곳으로만 드나들면서 낮은 선량 구역에서 높은 선량 구역 쪽으로만 들어가고, (4) 고장 난 펌프·스위치기어를 해치까지 끌어내 반출하고, (5) 전기실 앞에 점검 공간과 양쪽 출구가 있어야 한다. 지금 요건은 (1)과 (2)의 일부만 검사한다. 기기실 문이 계단실로 나는 배치(IBC §1023.4 위반)를 막지 못하고, 오염/비오염 동선, 반출 경로, 스위치기어 양단 출구, 막다른 복도는 아예 검사하지 않는다. 이 문서는 이 빈틈을 기존 규칙의 파라미터 변경과 새 규칙 6종으로 메운다. 수치는 원문을 확인한 것(OSHA 1910.303, 10 CFR 50 App. R, IAEA SSG-64·SSG-90)과 2차 자료로 확인한 것(IBC 2021), 공학적 가정을 구분해 적었다.",
+  "requirements": [
+    {
+      "id": "R1",
+      "what_ko": "펌프실·스위치기어실·축전지실 같은 기기실의 문은 피난계단실로 직접 나면 안 된다. 기기실은 복도로만 드나든다.",
+      "why_ko": "계단실은 불이 났을 때 연기가 들어오지 않는 마지막 피난로다. 사람이 상주하지 않는 기기실(화재 위험이 큰 곳)이 계단실로 바로 열리면 기기실 화재 연기가 계단실로 들어와 그 층 위 사람 모두의 피난로가 막힌다. 실제로 펌프실·스위치기어실의 유일한 문이 계단실로 난 배치가 나온 적이 있다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "circulation_types": [
+          "corridor",
+          "lobby"
+        ],
+        "_note": "기본값은 ['corridor','stair','elevator','lobby'] 라서 계단 코어(CORE-E/W)에 닿기만 해도 출입 가능으로 판정된다. stair 와 elevator 를 빼야 한다. CIRC-CONNECT·EGRESS 의 circulation_types 는 그대로 둔다 (계단은 복도망의 일부이고 출구다)."
+      },
+      "targets": "applies_to=[equipment, room] 전부 (AHU-*, BAT-*, BATT-*, CCW-*, COMP, CSP-*, CVCS-*, DECON, DG-TK-*, EDG-*, ESW-P-*, GRW, IA, LAB, LRW, MCR, RCA, RHR-HX-*, RSP, SFP*, SIP-*, SRW, SWGR-*)",
+      "source": {
+        "title": "IBC 2021 §1023.4 Openings (본문은 2025 California Building Code §1023.4 와 IBC 2021 인용 포럼으로 확인)",
+        "section": "§1023.4",
+        "url": "https://gocodebook.com/library/us/ca/ca-building-code/chapter-10-means-of-egress/section-1023-interior-exit-stairways-and-ramps",
+        "quote": "Openings in interior exit stairways and ramps other than unprotected exterior openings shall be limited to those required for exit access to the enclosure from normally occupied spaces and for egress from the enclosure. ... Elevators shall not open into interior exit stairways and ramps."
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "값 변경 — 현재 smr_aux.json 의 CIRC-ACCESS 는 circulation_types 를 지정하지 않아 기본값(stair 포함)이 적용된다. ICC Commentary 는 기계·전기실을 'normally occupied' 가 아닌 실의 예로 든다 (포럼 2차 인용이라 원문 대조 필요)."
+    },
+    {
+      "id": "R2",
+      "what_ko": "어떤 기기실도 다른 실(특히 다른 안전계열의 실)을 거쳐서 들어가지 않는다. 모든 기기실은 복도에 문 하나 폭 이상 직접 맞닿아야 한다.",
+      "why_ko": "A계열 펌프실을 B계열 실을 거쳐서만 들어갈 수 있으면, B계열 실에 불이 났을 때 A계열을 조작·수리하러 갈 수 없다. 화재구역 경계(방화문)도 하나 더 뚫어야 한다. 사람이 다른 실을 통과하며 피난하는 것도 IBC 가 제한한다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "via_rooms": 0,
+        "door_m": 1.2,
+        "through_ok": null
+      },
+      "targets": "전 기기실",
+      "source": {
+        "title": "IAEA SSG-64 (2021) Protection against Internal Hazards in the Design of NPPs",
+        "section": "para. 4.33, II.15; 보조: IBC 2021 §1016.2 (egress through intervening spaces)",
+        "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/PUB1947_web.pdf",
+        "quote": "This should be achieved by locating each redundant division of a safety system in its own fire compartment or at least in its own fire cell. The number of penetrations between fire compartments of different redundant divisions should be minimized (4.33). ... penetrations should be minimized, in particular between different redundant divisions. The fire resistance rating of any devices for closing passages, such as doors ... (II.15)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "이미 있음 (via_rooms 0). door_m 1.2 는 가정값으로 남는다 — 반출용 문 폭은 R12 참조."
+    },
+    {
+      "id": "R3",
+      "what_ko": "스위치기어실(폭 1.83 m 초과 배전반)은 작업공간 양 끝에 출입구가 하나씩, 모두 두 개 있어야 한다. 배치로 말하면 스위치기어실이 긴 변의 양 끝 근처 두 곳에서 동선(복도)에 맞닿아야 한다.",
+      "why_ko": "아크 사고는 배전반 앞에서 일어난다. 출구가 한쪽 끝에만 있으면 그 사이에 갇힌 작업자는 불꽃 쪽으로 지나가야 나갈 수 있다. 12 m 짜리 스위치기어실의 유일한 문이 한쪽 모서리에만 있으면 이 기준을 어긴다.",
+      "rule": "NEW:MULTI-DOOR",
+      "params": {
+        "min_doors": 2,
+        "door_m": 0.61,
+        "door_height_m": 1.98,
+        "min_door_spacing_frac": 0.5,
+        "circulation_types": [
+          "corridor",
+          "lobby"
+        ],
+        "exterior_counts": true,
+        "_exception": "OSHA (h)(4)(i)(A): 출구가 계속 이어지는 막힘없는 출구 경로가 있거나 작업공간 깊이를 두 배로 하면 출구 1개 허용 — 그 경우 clearance 를 3.0 m 로 하고 이 규칙을 끈다."
+      },
+      "targets": "^SWGR-(A|B)$",
+      "source": {
+        "title": "29 CFR 1910.303 (OSHA) Electric — General",
+        "section": "1910.303(h)(4)(i)(A) (600 V 초과); 1910.303(g)(1)(iv) (600 V 이하, 1200 A 이상·1.83 m 초과)",
+        "url": "https://www.govinfo.gov/content/pkg/CFR-2023-title29-vol5/pdf/CFR-2023-title29-vol5-sec1910-303.pdf",
+        "quote": "At least one entrance not less than 610 mm (24 in.) wide and 1.98 m (6.5 ft) high shall be provided ... On switchboard and control panels exceeding 1.83 m (6.0 ft) in width, there shall be one entrance at each end of such boards unless the location ... permits a continuous and unobstructed way of exit travel, or unless the work space ... is doubled."
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가. 현재는 문 1개(1.2 m 맞닿음)만 확인한다."
+    },
+    {
+      "id": "R4",
+      "what_ko": "스위치기어 앞에는 전압에 따라 정해진 깊이의 빈 점검 공간을 둔다. 4.16 kV 급(2,501~9,000 V)은 노출 충전부 반대편에 접지체(벽)가 있으면 1.5 m, 양쪽에 충전부가 있으면(배전반끼리 마주 보면) 1.8 m 다. 이 공간은 창고나 통로로 쓰지 않는다.",
+      "why_ko": "점검 공간이 좁으면 차단기를 빼낼 수 없고, 작업자가 충전부에 닿아 감전되거나 아크에 다친다. 면적을 줄이는 최적화는 이 공간부터 깎으려 한다.",
+      "rule": "NEW:CLEARANCE-MIN (블록 clearance 하한 검사)",
+      "params": {
+        "clearance_m": 1.5,
+        "clearance_if_facing_lineups_m": 1.8,
+        "rear_access_m": 0.762,
+        "_voltage_assumed": "안전등급 중압 모선 4.16 kV 가정 — 실제 공칭전압으로 표를 다시 읽을 것"
+      },
+      "targets": "^SWGR-(A|B)$",
+      "source": {
+        "title": "29 CFR 1910.303 Table S-2 (over 600 V), 각주 3",
+        "section": "1910.303(h)(3), Table S-2",
+        "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.303",
+        "quote": "Table S-2: 2501–9000 V — Condition A 1.2 m (4.0 ft) / B 1.5 m (5.0 ft) / C 1.8 m (6.0 ft). Condition B—Exposed live parts on one side and grounded parts on the other side. Condition C—Exposed live parts on both sides ... Where rear access is required ... a minimum working space of 762 mm (30 in.) horizontally shall be provided. Working space required by this standard may not be used for storage."
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "이미 있음 (spec 의 SWGR clearance 1.5 m) — 근거가 생겼다. 엔진이 clearance 를 줄이지 못하게 하한 검사를 추가할 것 (현재는 블록 속성일 뿐 근거·하한 표시가 없음). 배전반이 마주 보는 배치면 1.8 m 로 올린다."
+    },
+    {
+      "id": "R5",
+      "what_ko": "축전지 랙 앞 점검 공간은 최소 0.9 m (직류 125 V 등 대지전압 150 V 이하), 폭은 랙 폭 또는 0.76 m 중 큰 값.",
+      "why_ko": "축전지 교체·전해액 점검·셀 전압 측정을 해야 한다. 공간이 없으면 정기시험을 못 한다.",
+      "rule": "NEW:CLEARANCE-MIN",
+      "params": {
+        "clearance_m": 0.9,
+        "min_width_m": 0.762
+      },
+      "targets": "^BATT-(A|B)$",
+      "source": {
+        "title": "29 CFR 1910.303 Table S-1 (600 V 이하)",
+        "section": "1910.303(g)(1)(i), Table S-1",
+        "url": "https://www.govinfo.gov/content/pkg/CFR-2023-title29-vol5/pdf/CFR-2023-title29-vol5-sec1910-303.pdf",
+        "quote": "0–150 V: 0.9 m (3.0 ft) for Conditions A, B and C; 151–600 V: 0.9 / 1.0 / 1.2 m. ... the width of the equipment or 762 mm (30 in.), whichever is greater."
+      },
+      "status": "verified",
+      "priority": "low",
+      "changes_today": "이미 충족 (현재 clearance 1.2 m). 하한만 0.9 m 로 명시. 축전지 공칭전압이 150 V 를 넘으면 Table S-1 의 해당 행으로 바꾼다."
+    },
+    {
+      "id": "R6",
+      "what_ko": "안전정지에 필요한 A계열과 B계열은 서로 다른 화재구역에 둔다. 같은 구역이면 ① 3시간 내화벽, ② 가연물 없이 수평 6.096 m(20 ft) 초과 + 감지·자동소화, ③ 1시간 방벽 + 감지·자동소화 중 하나를 만족해야 한다.",
+      "why_ko": "불 하나로 두 계열이 모두 망가지면 원자로를 안전하게 멈출 수단이 없다. 다중성(계열을 두 개 둔 것)이 의미를 잃는다.",
+      "rule": "FIRE-20FT",
+      "params": {
+        "groups": [
+          [
+            "success_path:SP-A"
+          ],
+          [
+            "success_path:SP-B"
+          ]
+        ],
+        "min_horizontal_m": 6.096,
+        "combustible_free": true,
+        "detection_and_suppression": true,
+        "barrier_pairs": [
+          [
+            "SWGR-A",
+            "SWGR-B"
+          ],
+          [
+            "BATT-A",
+            "BATT-B"
+          ]
+        ]
+      },
+      "targets": "success_path:SP-A vs success_path:SP-B (SIP-*, CSP-*, EDG-*, SWGR-*, BATT-*)",
+      "source": {
+        "title": "10 CFR 50 Appendix R III.G.2; IAEA SSG-64 para. 4.33, II.14, II.31",
+        "section": "III.G.2(a)(b)(c)",
+        "url": "https://www.law.cornell.edu/cfr/text/10/appendix-R_to_part_50",
+        "quote": "(b) Separation of cables and equipment and associated non-safety circuits of redundant trains by a horizontal distance of more than 20 feet with no intervening combustible or fire hazards. ... (SSG-64 II.31) It is not possible to specify a single minimum distance that would provide adequate safe separation for all circumstances"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "이미 있음. 다만 성공경로(success_path)가 SIP·CSP·EDG·SWGR·BATT 에만 붙어 있고, 같은 계열의 CCW-P/HX·ESW-P·RHR-HX·SFP-CLG/HX·CVCS-P 는 train 속성만 있고 success_path 가 없어서 이 검사에서 빠진다. 이들이 안전정지에 필요한지(open_questions) 확인 후 success_path 를 붙일 것. SSG-64 는 '거리만'보다 '방화구획(fire containment approach)'을 우선 권고한다(II.32)."
+    },
+    {
+      "id": "R7",
+      "what_ko": "A계열 실과 B계열 실은 서로 다른 복도 줄에서 드나든다 (예: 각 층 COR-x1 은 A계열, COR-x2 는 B계열). 한 복도 구간에 A·B 계열 실 문이 같이 나지 않는다.",
+      "why_ko": "복도는 방호된 접근로여야 한다. A계열 실 화재 연기·소화수가 문 밑으로 복도에 퍼지면, 같은 복도에 문을 낸 B계열 실로 가는 길도 막히고 침수도 함께 번진다. 두 계열이 접근로까지 분리돼 있어야 한 계열에 사고가 나도 다른 계열을 조작하러 갈 수 있다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_for": [
+          [
+            "<train A 실>",
+            "^COR-\\d1-"
+          ],
+          [
+            "<train B 실>",
+            "^COR-\\d2-"
+          ]
+        ],
+        "_engine_caveat": "현재 엔진의 corridor_for·direct·through_ok·exterior_access 는 블록 'name' 에 정규식을 건다. 이 사례의 복도는 이름이 모두 '복도 (구간 k/6)' 로 같아서 줄(COR-x1/x2)을 구분할 수 없고, 실 이름은 한국어('안전주입펌프 #1')다. id 로도 매칭하도록 엔진을 바꾸거나 이름을 고쳐야 한다. id 기준 정규식 제안: A = '^(SIP-1|CSP-1|CCW-P-1|CCW-HX-1|ESW-P-1|RHR-HX-1|SFP-CLG-1|SFP-HX-1|CVCS-P-1|SWGR-A|BATT-A)$', B = '^(SIP-2|CSP-2|CCW-P-2|CCW-HX-2|ESW-P-2|RHR-HX-2|SFP-CLG-2|SFP-HX-2|CVCS-P-2|SWGR-B|BATT-B)$'."
+      },
+      "targets": "train:TrainA 실 → COR-?1-*, train:TrainB 실 → COR-?2-*",
+      "source": {
+        "title": "IAEA SSG-64 para. 4.38, 4.150; 10 CFR 50 App. R III.J",
+        "section": "SSG-64 4.38 / 4.150; App. R III.J",
+        "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/PUB1947_web.pdf",
+        "quote": "Adequate access routes for the firefighting teams or field plant personnel should also be provided and these should be protected. ... The layout of buildings should be arranged to prevent the propagation of fire and smoke from adjacent fire compartments or fire cells to the escape routes or access routes. (4.38) ... Typical pathways that flood water could traverse include ... stairwells, vents and elevators. Doors are also an important flood propagation pathway. (4.150)"
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "새로 추가. 원칙(접근로 보호·침수 경로)은 원문 확인, '계열별 복도 분리'라는 구체 배치 방식은 공학적 가정 — 계열당 복도를 따로 두면 면적이 늘 수 있으므로 소유자 판단 필요(open_questions)."
+    },
+    {
+      "id": "R8",
+      "what_ko": "방사선관리구역(오염 가능 구역)은 출입통제실(RCA)을 통해서만 드나든다. 관리구역 안 복도망과 바깥(비관리구역) 복도망은 RCA 를 거치지 않고는 이어지지 않는다. 비상 피난용 계단은 예외로 허용하되 평상시 출입로로 세지 않는다. RCA 는 한쪽은 비관리구역(외벽 또는 청정 복도), 다른 쪽은 관리구역 복도에 맞닿아야 한다.",
+      "why_ko": "출입 지점이 여러 개면 오염된 사람·물건이 오염 감시기를 거치지 않고 나가 오염이 건물 밖으로 퍼진다. 작업자 선량 기록도 빠진다.",
+      "rule": "NEW:CONTROLLED-BOUNDARY",
+      "params": {
+        "controlled": "zone:R1|zone:R2|zone:R3 (아래 targets)",
+        "gate": "RCA",
+        "max_gates": 1,
+        "emergency_exits_ok": [
+          "stair"
+        ],
+        "gate_must_touch": [
+          "exterior_or_clean_circulation",
+          "controlled_circulation"
+        ],
+        "door_m": 1.2
+      },
+      "targets": "관리구역 = ^(SFP|SFP-CLG-\\d|SFP-HX-\\d|RWST|RHR-HX-\\d|CVCS-P-\\d|CVCS-HX|BAT-\\d|LRW|SRW|GRW|DECON|LAB|HATCH)$ (spec 의 zone R1~R3). 출입통제 = RCA",
+      "source": {
+        "title": "IAEA SSG-90 (2024) Radiation Protection Aspects of Design for NPPs",
+        "section": "para. 5.7, 5.8, 3.48",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "Each controlled area should have the minimum practicable number of entrance and exit points for personnel and for materials and equipment, but have sufficient emergency exit points for personnel. (5.7) ... Exit doors should have an interlock with the contamination monitors to avoid uncontrolled exit of contaminated persons or equipment. (5.8)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가. 현재는 RCA–SFP/SRW soft 이격(10 m)과 RCA 외벽 접면만 있고, 동선 경계는 전혀 검사하지 않는다. ★ CIRC-CONNECT 는 층마다 복도망이 하나로 이어지기를 요구하므로 이 규칙과 충돌한다 — 관리/비관리 두 망을 각각 연결로 보도록 CIRC-CONNECT 에 'networks' 개념이 필요하다(new_rule_types 참조). 기기반출 해치(HATCH)는 물품 출입구이므로 관리구역 경계의 두 번째 출입점으로 셀지는 소유자 판단."
+    },
+    {
+      "id": "R9",
+      "what_ko": "관리구역 안에서 선량이 낮은 실로 가는 길이 선량이 높은 실 앞을 지나지 않게 한다. RCA 에서 가까운 쪽부터 R1 → R2 → R3 순서로 배치되어야 한다 (예: 분석실·제염실로 가는 복도가 사용후연료저장조·고체폐기물실 문 앞을 지나지 않음).",
+      "why_ko": "저선량 실에 일하러 가는 사람이 매번 고선량 실 앞을 지나면 쓸데없는 피폭이 쌓인다(ALARA 위반). 오염도 낮은 구역으로 옮겨진다.",
+      "rule": "NEW:ZONE-GRADIENT",
+      "params": {
+        "gate": "RCA",
+        "zone_order": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "zone_attr": "zone",
+        "mode": "corridor_path",
+        "penalty_m_per_crossing": 10.0
+      },
+      "targets": "zone R1(RCA, HATCH), R2(RWST, RHR-HX-*, CVCS-*, BAT-*, DECON, LAB), R3(SFP, SFP-CLG-*, SFP-HX-*, LRW, SRW, GRW)",
+      "source": {
+        "title": "IAEA SSG-90 (2024)",
+        "section": "para. 5.16, 5.17",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "The routes for personnel through radiation zones and contamination zones should be minimized to reduce the time spent in transit through these zones. (5.16) ... the layout of a controlled area should be designed such that personnel do not have to pass through higher radiation zones to gain access to lower radiation zones. (5.17)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가. 현재 RCA–SFP·SRW·LAB–SRW soft 이격은 '거리'만 보고 '동선 순서'는 보지 않는다. 라벨은 regulatory-numbers.md 금지 3에 따라 Zone 번호 대신 10 CFR 20.1003 정의 라벨로 바꿀 것 (현재 R1~R3 은 가상 사례 라벨)."
+    },
+    {
+      "id": "R10",
+      "what_ko": "비관리구역 실(주제어실·전산실·원격정지반·스위치기어·축전지·비상디젤발전기·공조실·압축공기)은 관리구역 복도로 드나들지 않는다. 관리구역 실(R8 목록)은 관리구역 복도로만 드나든다.",
+      "why_ko": "주제어실 운전원이 교대할 때마다 방호복을 입고 오염 감시를 받아야 하면 운전이 안 된다. 반대로 관리구역 실이 청정 복도에 문을 내면 오염이 청정 구역으로 샌다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_for": [
+          [
+            "<관리구역 실>",
+            "<관리구역 복도>"
+          ],
+          [
+            "<비관리구역 실>",
+            "<비관리구역 복도>"
+          ]
+        ],
+        "_engine_caveat": "R7 과 같은 이름 매칭 문제. R7 의 계열 분리와 R10 의 구역 분리를 동시에 만족하려면 층마다 복도 줄이 3개 이상 필요할 수 있다 — 어느 기준을 우선할지 open_questions."
+      },
+      "targets": "비관리: ^(MCR|COMP|RSP|SWGR-[AB]|BATT-[AB]|EDG-\\d|DG-TK-\\d|AHU-\\d|IA|ESW-P-\\d|CCW-P-\\d|CCW-HX-\\d)$ / 관리: R8 targets",
+      "source": {
+        "title": "IAEA SSG-90 (2024)",
+        "section": "para. 5.7, 5.12, 5.13, 5.17",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "Within changing areas, a physical barrier should be provided to clearly separate the clean area from the potentially contaminated area. (5.13)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가. 원칙은 원문 확인, 실별 관리/비관리 구분은 spec 의 zone 값(NR/CTRL vs R1~R3)을 그대로 쓴 것. SIP·CSP 는 zone 이 'TrainA/TrainB' 로 되어 있어 관리구역인지 알 수 없다(open_questions)."
+    },
+    {
+      "id": "R11",
+      "what_ko": "관리구역에서도 비상 피난로는 충분히 있어야 한다. 관리구역 복도망과 비관리구역 복도망은 각각 서로 떨어진 계단 2개 이상에 닿아야 한다 (평상시 출입은 RCA 하나, 비상시 출구는 여럿).",
+      "why_ko": "출입 지점을 하나로 줄이는 것(R8)과 피난로를 두 개 이상 두는 것은 서로 당긴다. 관리구역에 계단이 하나뿐이면 그 계단 쪽에 불이 나면 관리구역 작업자가 갇힌다.",
+      "rule": "EGRESS",
+      "params": {
+        "min_exits": 2,
+        "exit_separation_frac": 0.333,
+        "max_travel_m": 76.2,
+        "per_network": true,
+        "_note": "per_network 는 새 파라미터 — R8 의 관리/비관리 망마다 따로 계단 수를 센다. 현재 엔진은 층 단위로만 센다."
+      },
+      "targets": "층별 관리구역 망, 비관리구역 망",
+      "source": {
+        "title": "IAEA SSG-64 para. II.22; IAEA SSG-90 para. 5.7; IBC 2021 §1006.3, §1007.1.1",
+        "section": "SSG-64 II.22",
+        "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/PUB1947_web.pdf",
+        "quote": "Ideally, a minimum of two escape routes from every building should be provided. ... Protected access routes and escape routes comprise staircases and passageways leading to an exit from the building. (II.22) ... but have sufficient emergency exit points for personnel. (SSG-90 5.7)"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "값 변경 — EGRESS 는 이미 있다(층당 2개, 1/3 대각선, 76.2 m). 망별로 세는 per_network 를 추가. 76.2 m 는 IBC Table 1017.2 F-1 스프링클러 값으로 기존 독립 검증에 따름 (H 용도로 분류되면 더 짧아진다 — open_questions)."
+    },
+    {
+      "id": "R12",
+      "what_ko": "고장 난 기기를 통째로 꺼낼 수 있어야 한다. 정비·교체 대상 기기실마다 기기반출 해치(HATCH)까지 복도로 이어진 반출 경로가 있고, 그 경로의 모든 폭(복도 폭, 실–복도 맞닿은 길이, 복도–해치 맞닿은 길이)이 그 기기의 짧은 변 + 여유 이상이어야 한다. 해치가 없는 층의 기기는 해치 층까지 같은 층 복도로 간다.",
+      "why_ko": "면적을 줄이면 복도 끝이 꺾이고 좁아져 펌프·열교환기·스위치기어 반이 문은 통과해도 해치까지 못 간다. 그러면 교체할 때 벽을 헐어야 하고, 방사선 구역이면 작업자 피폭이 크게 늘어난다.",
+      "rule": "NEW:REMOVAL-PATH",
+      "params": {
+        "to": "HATCH",
+        "item_width": "min(w, d) of the equipment block",
+        "margin_m": 0.6,
+        "via": [
+          "corridor"
+        ],
+        "check_door_contact": true,
+        "_note": "기기 블록 치수는 '실' 치수일 수 있다 — 실제 반출 단위(펌프 본체 등) 치수가 있으면 그 값을 쓴다. margin 0.6 m 는 양쪽 0.3 m 가정."
+      },
+      "targets": "^(SIP|CSP|CCW-P|CCW-HX|ESW-P|RHR-HX|SFP-CLG|SFP-HX|CVCS-P|CVCS-HX|SWGR|AHU|IA|EDG)",
+      "source": {
+        "title": "IAEA SSG-90 (2024) para. 5.19(b), 3.62; IAEA SSR-2/1 Rev.1 Requirement 29 (regulatory-numbers.md 에 기수록)",
+        "section": "SSG-90 5.19(b), 5.19(h), 3.62",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "Provision of clear passageways of adequate dimensions to facilitate the removal of plant items to a workshop for decontamination and repair or disposal. (5.19(b)) ... The routes for removing large items of plant equipment during decommissioning should be planned at the design stage (3.62)"
+      },
+      "status": "assumed",
+      "priority": "high",
+      "changes_today": "새로 추가. 요구 자체는 원문 확인, 폭 수치(min(w,d)+0.6 m)는 가정. EDG 는 외벽 직접 반출(R16)이면 제외 가능. 현재 LOAD-PATH 는 HATCH→SRW 한 경로의 '낙하 시 계열 동시 손상'만 보고, 경로가 실제로 통하는지는 보지 않는다."
+    },
+    {
+      "id": "R13",
+      "what_ko": "기기반출 해치는 그것이 관통하는 모든 층에서 복도(또는 적치 공간)에 해치 한 변 정도 길이로 맞닿아야 한다. 1층에서는 외벽(트럭 반입구)에도 맞닿는다.",
+      "why_ko": "해치가 다른 기기실 안이나 복도에서 떨어진 곳에 있으면 위층 기기를 해치까지 옮길 수 없다. 해치는 있는데 쓸 수 없는 공간이 된다.",
+      "rule": "NEW:HATCH-SERVE",
+      "params": {
+        "opening": "HATCH",
+        "min_contact_m": 4.0,
+        "circulation_types": [
+          "corridor"
+        ],
+        "all_spanned_floors": true,
+        "ground_floor_exterior": true,
+        "_note": "4.0 m = 이 사례 복도 폭(가정). 해치 안에 다른 실이 문을 내는 것은 FIRE-HATCH 가 화재구역 병합으로 따로 본다."
+      },
+      "targets": "HATCH (f0 + TALL-EQUIP 로 관통하는 위층 그림자)",
+      "source": {
+        "title": "IAEA SSG-90 (2024) para. 5.19(h); spec 의 HATCH need_exterior",
+        "section": "5.19(h)",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "Provision of ladders, access platforms, crane rails or cranes in areas where their use is foreseen for the maintenance or removal of plant components."
+      },
+      "status": "assumed",
+      "priority": "high",
+      "changes_today": "새로 추가. 현재 HATCH 는 외벽 접면·크레인 커버만 있고 위층 복도 연결은 검사하지 않는다(HATCH 는 circulation 도 아니고 CIRC-ACCESS 대상 kind 도 아님)."
+    },
+    {
+      "id": "R14",
+      "what_ko": "1층 해치 옆에 기기를 내려놓고 옮겨 실을 수 있는 빈 적치 공간(laydown)을 둔다. 크기는 해치 바닥 면적 이상(가정).",
+      "why_ko": "적치 공간이 없으면 정비 기간에 꺼낸 기기·차폐재·비계를 복도에 쌓게 되고, 복도는 피난로라서 비워 둬야 한다(SSG-64 II.22(b)).",
+      "rule": "NEW:LAYDOWN",
+      "params": {
+        "adjacent_to": "HATCH",
+        "floor": 0,
+        "min_w_m": 9.0,
+        "min_d_m": 9.0,
+        "may_overlap_circulation": false
+      },
+      "targets": "HATCH (f0)",
+      "source": {
+        "title": "IAEA SSG-90 (2024) para. 3.44; IAEA SSG-64 para. II.22(b)",
+        "section": "SSG-90 3.44",
+        "url": "https://regelwerk.grs.de/sites/default/files/SSG-90.pdf",
+        "quote": "The design should also provide enough space for lay‑down areas during maintenance activities to ensure easy access and to reduce time spent in areas with higher radiation levels. (3.44) ... Access routes and escape routes should be kept clear of any stored material. (SSG-64 II.22(b))"
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "새로 추가. FREE-AREA(층 면적 비율)가 있지만 위치를 지정하지 않아 빈 곳이 해치와 떨어져 생길 수 있다. 9×9 m 는 해치와 같은 크기로 둔 가정값."
+    },
+    {
+      "id": "R15",
+      "what_ko": "복도 구간을 없애고 남길 때 막다른 복도가 생기면 그 길이는 15.24 m(50 ft) 이하. (스프링클러 없는 경우 6.1 m = 20 ft)",
+      "why_ko": "막다른 복도 끝 실에 있던 사람은 불이 복도 입구 쪽에서 나면 빠져나갈 방향이 없다. 복도 구간을 '필요한 만큼만' 남기는 최적화는 막다른 가지를 만들기 쉽다.",
+      "rule": "NEW:DEAD-END",
+      "params": {
+        "max_dead_end_m": 15.24,
+        "measure": "복도 끝에서 서로 다른 두 출구로 갈라지는 지점까지의 복도 중심선 길이",
+        "circulation_types": [
+          "corridor"
+        ],
+        "exit_types": [
+          "stair"
+        ]
+      },
+      "targets": "^COR-",
+      "source": {
+        "title": "IBC 2021 §1020.5 Dead ends (2차 자료 — ICC 해석 BU 21-68-23, NFSA)",
+        "section": "§1020.5 및 Exception 2",
+        "url": "https://nfsa.org/2020/11/30/sprinkler-advantages-for-dead-end-corridors/",
+        "quote": "Where more than one exit or exit access doorway is required, the exit access shall be arranged such that dead-end corridors do not exceed 20 feet in length. ... 50 feet for Groups B, E, F, I-1, M, R-1, R-2, S and U where the building is equipped throughout with an automatic sprinkler system"
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "새로 추가. 현재 CIRC-CONNECT 는 '이어져 있음'만, EGRESS 는 '직선거리'만 본다 — 막다른 가지는 둘 다 통과한다. 스프링클러 설치 여부(open_questions)에 따라 6.1 m / 15.24 m."
+    },
+    {
+      "id": "R16",
+      "what_ko": "비상디젤발전기(EDG) 두 대는 서로 떨어진 별도 실(별도 화재구역)에 두고, 각 실은 외벽에 맞닿아 연소공기·배기와 기기 반출을 외부로 직접 한다. 각 EDG 의 연료탱크는 자기 계열 EDG 쪽에 두고 다른 계열 EDG 와는 떨어뜨린다.",
+      "why_ko": "외부전원 상실 때 EDG 가 유일한 교류 전원이다. 한 대의 연료 화재가 다른 계열 EDG 까지 번지면 두 대를 모두 잃는다. 내부 실에 두면 연소공기·배기를 긴 덕트로 끌어와야 하고, 디젤 엔진 반출 경로도 없다.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          {
+            "a": "EDG-1",
+            "b": "EDG-2",
+            "min_dist": 18.0,
+            "hard": true,
+            "_status": "기존 — 가정값"
+          },
+          {
+            "a": "EDG-1",
+            "b": "DG-TK-2",
+            "min_dist": 6.096,
+            "hard": true,
+            "_basis": "App. R III.G.2(b) 20 ft — 다른 계열 연료(가연물)와 분리"
+          },
+          {
+            "a": "EDG-2",
+            "b": "DG-TK-1",
+            "min_dist": 6.096,
+            "hard": true,
+            "_basis": "동일"
+          }
+        ],
+        "exterior": [
+          "EDG-1",
+          "EDG-2"
+        ]
+      },
+      "targets": "EDG-1, EDG-2, DG-TK-1, DG-TK-2",
+      "source": {
+        "title": "IAEA SSG-64 para. 3.19(a), 4.32; 10 CFR 50 App. R III.G.2",
+        "section": "SSG-64 3.19(a), 4.32",
+        "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/PUB1947_web.pdf",
+        "quote": "The concept of segregation is applicable at the following levels: (a) Plant layout: for example, separating the emergency diesel generators from one another. (3.19) ... The design aim should be to segregate items important to safety from high fire loads and to segregate redundant safety systems from each other. (4.32)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "일부 이미 있음 (EDG-1/2 18 m, DG-TK-1/2 12 m, EDG 외벽). 교차 쌍(EDG-1–DG-TK-2, EDG-2–DG-TK-1) 이격을 새로 추가. 외벽 요건의 '연소공기·배기' 근거는 원문 미확인(가정). EDG 실 안 일일탱크 4,164 L 제한(RG 1.189, regulatory-numbers.md)은 기존 비고 그대로."
+    },
+    {
+      "id": "R17",
+      "what_ko": "디젤 연료·방사성폐기물처럼 화재하중이 큰 것(디젤 연료탱크, 고체폐기물 저장)은 다른 계열의 안전설비 실과 가연물 없이 6.096 m 이상 떨어뜨리거나 3시간 벽으로 나눈다.",
+      "why_ko": "화재하중이 큰 실의 불은 오래 타고 뜨거워서 옆 실 벽을 넘어 번지기 쉽다. 안전설비 옆에 두면 한 번의 불로 계열이 손상된다.",
+      "rule": "NEW:SEP-GROUP (그룹 간 최소 간극 — 기존 SEP 의 다대다 판)",
+      "params": {
+        "a": [
+          "DG-TK-1",
+          "DG-TK-2",
+          "SRW",
+          "LRW"
+        ],
+        "b": [
+          "success_path:SP-A",
+          "success_path:SP-B"
+        ],
+        "min_dist_m": 6.096,
+        "same_train_exempt": true,
+        "barrier_pairs": []
+      },
+      "targets": "고화재하중: DG-TK-*, SRW, LRW / 보호대상: 성공경로 SP-A·SP-B",
+      "source": {
+        "title": "IAEA SSG-64 para. 4.32; 10 CFR 50 App. R III.G.2(b)",
+        "section": "SSG-64 4.32",
+        "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/PUB1947_web.pdf",
+        "quote": "The plant layout should be such that combustible materials (solids, liquids and gases) are not in proximity to items important to safety, as far as practicable."
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가. 원칙은 원문 확인, 6.096 m 를 '고화재하중–안전설비' 거리로 쓰는 것은 App. R 의 계열 간 거리를 빌린 가정. 어떤 실이 고화재하중인지는 화재위험분석에서 정한다."
+    },
+    {
+      "id": "R18",
+      "what_ko": "주제어실(MCR)에서 원격정지반(RSP)까지 복도·계단으로 가는 길이 있어야 하고, 그 길은 MCR 과 같은 화재구역(FZ-CTRL: 전산실 등)의 실을 지나지 않는다. 각 계열 안전정지 기기실까지 가는 접근로도 다른 계열 실을 지나지 않는다(R2 로 충족).",
+      "why_ko": "주제어실 화재로 운전원이 대피하면 원격정지반에서 원자로를 멈춘다. 가는 길이 불난 구역을 지나면 대체정지 수단이 있으나 마나다. App. R 은 이 접근로에 8시간 비상조명을 요구한다 — 접근로가 존재해야 한다는 뜻이다.",
+      "rule": "NEW:ROUTE-INDEP",
+      "params": {
+        "from": "MCR",
+        "to": "RSP",
+        "via": [
+          "corridor",
+          "stair"
+        ],
+        "avoid_fire_zones_of_from": true,
+        "max_route_m": null,
+        "_note": "max_route_m 은 근거 없음 — 운전원 이동시간 해석에서 주입."
+      },
+      "targets": "MCR → RSP",
+      "source": {
+        "title": "10 CFR 50 Appendix R III.G.3, III.J; IAEA SSG-64 para. 4.36(c), 4.52",
+        "section": "III.J",
+        "url": "https://www.law.cornell.edu/cfr/text/10/appendix-R_to_part_50",
+        "quote": "Emergency lighting units with at least an 8-hour battery power supply shall be provided in all areas needed for operation of safe shutdown equipment and in access and egress routes thereto. (III.J) ... The supplementary control room should be located in a fire compartment separate from the one containing the main control room. The ventilation system for the supplementary control room should not be a common system shared with the main control room. (SSG-64 4.52)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가. 현재 RSP–MCR 15 m 이격(가정값)과 서로 다른 fire_zone 만 있고 경로는 보지 않는다. SSG-64 4.52 의 '공조 비공유'는 배치와 무관(not_layout_related)."
+    },
+    {
+      "id": "R19",
+      "what_ko": "복도의 최소 폭은 사람 피난 기준 1.118 m(44 in) 이상이고 층마다 복도·계단이 끊기지 않는다. 다만 R8 에 따라 관리/비관리 두 망을 각각 하나로 이어진 망으로 본다.",
+      "why_ko": "복도가 끊기면 일부 실에서 계단으로 갈 수 없다.",
+      "rule": "CIRC-CONNECT",
+      "params": {
+        "min_width_m": 1.118,
+        "must_include": [
+          "stair"
+        ],
+        "networks": "R8 의 관리/비관리 망 — 새 파라미터"
+      },
+      "targets": "^COR-, ^CORE-",
+      "source": {
+        "title": "IBC 2021 Table 1020.3",
+        "section": "Table 1020.3",
+        "url": "https://codes.iccsafe.org/content/IBC2021P2/chapter-10-means-of-egress",
+        "quote": "(기존 smr_aux.json _sources 에서 확인된 값 — 이번 조사에서 ICC 사이트 403 으로 재확인 못 함)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "값 변경 — 이미 있음(min_width 1.118). networks 개념 추가가 필요하다(R8 과의 충돌 해소)."
+    }
+  ],
+  "room_sizes": [
+    {
+      "match": "^SWGR-(A|B)$",
+      "min_area_m2": 0,
+      "min_clear_dim_m": 4.6,
+      "basis": "짧은 변 ≥ 배전반 깊이(가정 2.3 m) + 앞 점검 공간 1.5 m (OSHA 1910.303 Table S-2 Condition B, 2501–9000 V) + 뒤 점검 0.762 m (Table S-1/S-2 각주 3, 뒤쪽 접근이 필요한 경우). 배전반 깊이는 가정이다. 현재 12×6 m 는 충족.",
+      "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.303",
+      "status": "assumed"
+    },
+    {
+      "match": "^BATT-(A|B)$",
+      "min_area_m2": 0,
+      "min_clear_dim_m": 2.5,
+      "basis": "짧은 변 ≥ 랙 깊이(가정 0.8 m) × 2열 마주보기 중 최소 1열 + 통로 0.9 m (OSHA 1910.303 Table S-1, 0–150 V). 랙 구성은 가정. 현재 8×5 m 는 충족.",
+      "url": "https://www.govinfo.gov/content/pkg/CFR-2023-title29-vol5/pdf/CFR-2023-title29-vol5-sec1910-303.pdf",
+      "status": "assumed"
+    },
+    {
+      "match": "^HATCH$",
+      "min_area_m2": 0,
+      "min_clear_dim_m": 0,
+      "basis": "해치 한 변 ≥ 반출할 최대 기기(블록)의 짧은 변 + 여유. 이 사례 최대 반출 단위가 정해지지 않았다 — 근거가 없어 값을 넣지 않음(open_questions). 현재 9×9 m 유지.",
+      "url": "",
+      "status": "assumed"
+    }
+  ],
+  "new_rule_types": [
+    {
+      "name": "MULTI-DOOR",
+      "semantics_ko": "대상 실 r 에 대해, 허용된 동선 블록(또는 exterior_counts 이면 층 외곽선)과 맞닿은 선분 중 길이 ≥ door_m 인 '문 후보 구간'들을 구한다. 그 구간들에서 서로 거리가 min_door_spacing_frac × (r 의 긴 변) 이상 떨어진 두 점을 고를 수 있으면 통과(min_doors=2). 위반량 = max(0, 요구 간격 − 달성 가능한 최대 간격) [m], 문 후보가 하나도 없으면 r 의 긴 변 전체.",
+      "params": {
+        "min_doors": "필요한 출입구 수 (OSHA: 2)",
+        "door_m": "출입구 순폭 하한 (OSHA: 0.61 m)",
+        "door_height_m": "기록용 (2D 엔진은 검사 안 함)",
+        "min_door_spacing_frac": "두 출입구 사이 최소 거리 / 실의 긴 변 ('양 끝' ≈ 0.5 이상)",
+        "circulation_types": "문으로 인정하는 동선 종류 (stair 제외 — R1)",
+        "exterior_counts": "외벽 문도 출입구로 인정할지"
+      }
+    },
+    {
+      "name": "CLEARANCE-MIN",
+      "semantics_ko": "블록의 clearance(유지보수 이격) 값이 하한 이상인지 Gate 1 에서 정적으로 검사한다. 배치 중에는 블록 외곽에서 clearance 폭의 띠가 다른 블록과 겹치지 않는지(현 엔진이 이미 clearance 를 패킹에 쓰는지 확인 필요) 본다. 하한 미만이면 ERROR.",
+      "params": {
+        "clearance_m": "하한 (근거 인용 필수)",
+        "clearance_if_facing_lineups_m": "같은 종류 블록이 clearance 띠를 공유해 마주 볼 때의 하한 (Condition C)",
+        "rear_access_m": "뒤쪽 접근 필요 시 뒤쪽 띠 폭"
+      }
+    },
+    {
+      "name": "CONTROLLED-BOUNDARY",
+      "semantics_ko": "층마다 동선 블록을 '관리 망'(관리구역 실이 문을 낸 복도)과 '비관리 망'으로 나눈다. 두 망의 복도 블록끼리 맞닿은 길이 ≥ door_m 인 간선이 있으면 위반(경계 누설). 두 망을 잇는 경로는 gate 블록(RCA)을 통해서만 허용 — gate 는 양쪽 망(또는 비관리 쪽은 외곽선)에 각각 door_m 이상 맞닿아야 한다. emergency_exits_ok 종류(계단)는 두 망이 공유해도 누설로 세지 않는다. 관리구역 실이 비관리 망 복도에 door_m 이상 맞닿기만 해도 문을 낼 수 있으므로 위반으로 센다(문 위치를 엔진이 고르지 않기 때문 — 보수적). 위반량 = 누설 간선 수 × penalty [건→m].",
+      "params": {
+        "controlled": "관리구역 실 선택자",
+        "gate": "출입통제 블록 id",
+        "max_gates": "관리 망에 평상시 출입점 수 상한",
+        "emergency_exits_ok": "공유를 허용하는 동선 종류",
+        "door_m": "누설로 보는 맞닿음 길이 하한",
+        "penalty_m_per_leak": "스칼라화 계수"
+      }
+    },
+    {
+      "name": "ZONE-GRADIENT",
+      "semantics_ko": "관리 망에서 gate(RCA)로부터 각 복도 블록까지 그래프 최단경로를 구한다. 각 복도 블록의 '구역 수준' = 그 블록에 문을 낼 수 있는(door_m 이상 맞닿은) 실의 zone_order 최댓값. 어떤 실 r(수준 z_r)의 최단 진입경로 위에 수준 > z_r 인 복도 블록이 있으면 위반 1건. 위반량 = 건수 × penalty_m_per_crossing.",
+      "params": {
+        "gate": "출입 기준점",
+        "zone_order": "낮은 선량→높은 선량 순 라벨 목록",
+        "zone_attr": "블록의 구역 속성 이름",
+        "mode": "corridor_path (복도 그래프 경로 기준)",
+        "penalty_m_per_crossing": "스칼라화 계수"
+      }
+    },
+    {
+      "name": "REMOVAL-PATH",
+      "semantics_ko": "대상 기기 e 마다 필요 폭 W_e = min(w_e, d_e) + margin. e 가 복도 블록과 W_e 이상 맞닿고, 그 복도에서 HATCH(같은 층 그림자 포함)까지, 맞닿은 길이 ≥ W_e 이면서 복도 블록 자체의 짧은 변 ≥ W_e 인 간선만으로 이어진 경로가 있으면 통과. HATCH 가 없는 층에서 HATCH 층으로 가는 다른 수단(크레인 등)은 이 엔진에선 없다고 본다 — HATCH 는 TALL-EQUIP 로 모든 층을 관통하므로 같은 층 그림자까지 가면 된다. 위반량 = 도달 못 한 기기 수 × 10 m + 병목 폭 부족분 합 [m].",
+      "params": {
+        "to": "반출 해치 id",
+        "item_width": "기기 반출 폭 정의",
+        "margin_m": "양쪽 여유 합",
+        "via": "경로로 쓰는 동선 종류",
+        "check_door_contact": "기기실–복도 맞닿음도 W_e 이상인지"
+      }
+    },
+    {
+      "name": "HATCH-SERVE",
+      "semantics_ko": "HATCH 가 차지하는 모든 층(그림자 포함)에서 HATCH 와 복도 블록의 맞닿은 길이 합의 최댓값 ≥ min_contact_m. ground_floor_exterior 이면 1층에서 층 외곽선에도 맞닿아야 한다(현재 need_exterior 와 같음). 위반량 = Σ_층 max(0, min_contact − 맞닿음) [m].",
+      "params": {
+        "opening": "해치 블록",
+        "min_contact_m": "층별 복도 맞닿음 하한",
+        "all_spanned_floors": "관통하는 모든 층에서 검사",
+        "ground_floor_exterior": "1층 외벽 접면 요구"
+      }
+    },
+    {
+      "name": "LAYDOWN",
+      "semantics_ko": "지정 층에서 adjacent_to 블록에 맞닿은(간극 ≤ touch_tol) 빈 직사각형(어떤 블록·clearance 띠와도 겹치지 않고, may_overlap_circulation=false 면 복도와도 겹치지 않음) min_w × min_d 를 외피 안에 놓을 수 있으면 통과. 결정변수로 laydown 블록을 하나 추가하는 방식(빈 'room' 블록, adjacency 강제)이 구현이 가장 쉽다. 위반량 = 놓을 수 있는 최대 직사각형과의 면적 부족분 [m²] — 단위 주의.",
+      "params": {
+        "adjacent_to": "기준 블록",
+        "floor": "층",
+        "min_w_m": "폭",
+        "min_d_m": "깊이",
+        "may_overlap_circulation": "복도와 겹쳐도 되는지"
+      }
+    },
+    {
+      "name": "DEAD-END",
+      "semantics_ko": "층마다 복도 블록 그래프(맞닿음 ≥ min_width)를 만들고, 각 복도 블록 중심에서 서로 다른 출구(계단) 두 개로 가는 경로가 처음 갈라지는 블록까지의 중심선 거리를 잰다. 출구가 하나뿐인 가지의 끝단에서 분기점(또는 출구가 2개로 갈라지는 지점)까지 길이 > max_dead_end_m 이면 초과분이 위반량 [m]. 복도 끝에 계단이 바로 붙어 있으면 막다른 복도가 아니다.",
+      "params": {
+        "max_dead_end_m": "IBC §1020.5 — 20 ft(6.096 m), 스프링클러 F 용도 50 ft(15.24 m)",
+        "measure": "측정 방법 설명",
+        "circulation_types": "복도로 보는 종류",
+        "exit_types": "출구 종류"
+      }
+    },
+    {
+      "name": "ROUTE-INDEP",
+      "semantics_ko": "from 블록에서 to 블록까지 via 동선만으로 이어진 경로(맞닿음 ≥ door_m)가 있는지, 그리고 그 경로의 복도 블록이 from 의 fire_zone 에 속한 다른 실에만 접한 막다른 구간을 지나지 않는지(= from 과 같은 fire_zone 실을 통과 경로로 쓰지 않는지) 본다. 층이 다르면 stair 블록으로 층을 바꾼다(stack_cores 로 같은 좌표). 위반량 = 경로 없음 30 m, 금지 구역 통과 블록 수 × 10 m.",
+      "params": {
+        "from": "출발 블록",
+        "to": "도착 블록",
+        "via": "쓸 수 있는 동선 종류",
+        "avoid_fire_zones_of_from": "출발 블록과 같은 화재구역의 실을 거치지 않음",
+        "max_route_m": "경로 길이 상한 (근거 있을 때만)"
+      }
+    },
+    {
+      "name": "SEP-GROUP",
+      "semantics_ko": "그룹 a 의 모든 블록과 그룹 b 의 모든 블록 쌍 (같은 층, same_train_exempt 면 같은 train 쌍 제외, barrier_pairs 제외)에 대해 Σ max(0, min_dist − gap) [m]. 기존 separations 를 다대다로 일반화한 것.",
+      "params": {
+        "a": "선택자 목록",
+        "b": "선택자 목록",
+        "min_dist_m": "최소 간극",
+        "same_train_exempt": "같은 계열끼리는 면제",
+        "barrier_pairs": "내화방벽 면제 쌍"
+      }
+    },
+    {
+      "name": "CIRC-ACCESS.corridor_for (엔진 수정)",
+      "semantics_ko": "지금은 실·복도 '이름'에만 정규식을 건다. 이름이 같은 복도 구간(이 사례: '복도 (구간 k/6)')을 줄로 구분할 수 없으므로 id 에도 매칭하게 한다 (direct·through_ok·exterior_access 도 같음).",
+      "params": {
+        "match_on": "name | id | both (기본 both 제안)"
+      }
+    },
+    {
+      "name": "EGRESS.per_network / CIRC-CONNECT.networks (엔진 수정)",
+      "semantics_ko": "CONTROLLED-BOUNDARY 로 나눈 망마다 따로 연결성(CIRC-CONNECT)과 출구 수·출구 간 이격(EGRESS)을 센다. 공유 계단은 두 망 모두의 출구로 셀 수 있다.",
+      "params": {
+        "networks": "CONTROLLED-BOUNDARY id 참조"
+      }
+    }
+  ],
+  "not_layout_related": [
+    "App. R III.J 비상조명 8시간 배터리 — 조명 설비 사양 (접근로의 존재만 R18 에 반영)",
+    "SSG-64 4.68–4.70 축전지실 수소 환기·수소 감지기 — 환기 설비 사양 (축전지실을 막힌 내부실로 두어도 기계환기로 해결 가능하므로 외벽 요구를 근거로 삼지 않음)",
+    "RG 1.128 Rev.3 (2024, 89 FR 31602) — IEEE 484-2019 축전지 설치·환기·내진 거치 승인. 공개 요약에 배치 수치 없음. (브리프의 'RG 1.137' 은 EDG 연료유 계통 지침이며 축전지 지침은 RG 1.128 이다)",
+    "SSG-64 4.39–4.41 화재구역별 공조 분리·방화댐퍼 — 덕트 설계",
+    "SSG-64 4.52 MCR 과 대체제어실 공조 비공유 — 계통 설계 (실 분리는 기존 SEP 로 반영)",
+    "SSG-64 II.22(i)(j) 계단 가압·자동폐쇄 방화문·피난 방향 문 열림 — 문·환기 사양",
+    "SSG-90 5.8 출구 오염감시기 인터록, 5.15 고선량실 잠금문 — 문 하드웨어",
+    "SSG-90 5.13 탈의실 청결/오염 물리적 칸막이 — RCA 블록 내부 설계 (RCA 의 위치는 R8 에 반영)",
+    "OSHA 1910.303(h)(3) 작업공간 높이 1.98 m — 2D 엔진에서 검사 불가, 층고 8.5 m 로 충족",
+    "IBC §1023.5 계단실 관통 금지·§1023.6 계단 독립 환기 — 배관·덕트 경로",
+    "App. R III.G.2 의 3시간/1시간 내화방벽 등급 — 벽 사양 (barrier_pairs 로만 표현)",
+    "NFPA 805 — 성능기반 화재방호 프로그램 전반(유료 본문 미확인). 배치 관련 수치는 App. R/RG 1.189 와 같은 III.G 체계로 반영됨"
+  ],
+  "open_questions": [
+    "CCW·ESW·RHR-HX·SFP-CLG/HX·CVCS-P 계열 설비가 App. R 안전정지(고온정지) 성공경로에 들어가는가? 들어가면 success_path 를 붙여 FIRE-20FT 대상으로 해야 한다 (R6).",
+    "안전주입펌프(SIP)·격납살수펌프(CSP)는 방사선관리구역(오염 가능)인가? spec 의 zone 값이 'TrainA/TrainB' 로 되어 있어 R8–R10 에서 분류할 수 없다.",
+    "계열별 복도 분리(R7)와 관리/비관리 복도 분리(R10)를 둘 다 하면 층마다 복도 줄이 3~4개 필요할 수 있다. 어느 쪽을 우선하는가, 아니면 3시간 방화구획 + 복도 공유를 허용하는가?",
+    "건물 전체 자동 스프링클러 설치 여부 — 막다른 복도 한도(6.1 m vs 15.24 m), 피난거리, App. R III.G.2(b) 거리 예외 성립 여부가 모두 달라진다.",
+    "IBC 용도 분류: F-1(공장)인가 H(위험물 — 디젤연료·축전지 수소)인가? H 이면 보행거리·막다른 복도 한도가 더 엄격하다.",
+    "안전등급 스위치기어 공칭전압(4.16 kV 가정)과 배전반 배치(한 줄 / 두 줄 마주봄) — 점검 공간 1.5 m vs 1.8 m (R4).",
+    "반출해야 하는 최대 기기 단위의 치수와 무게(해치 크기 R13, 반출 경로 폭 R12). 기기 블록 치수가 '실' 치수인지 '기기' 치수인지.",
+    "기기반출 해치를 관리구역의 두 번째 출입점으로 볼지(R8 max_gates), 해치 위층 개구부가 관리구역 안인지.",
+    "MCR → RSP 운전원 이동 허용시간(R18 max_route_m) — 운전원 조치 시간 해석 결과.",
+    "laydown 공간 크기(R14) — 정비 기간 최대 반출 기기·차폐재 적치 계획.",
+    "관리구역 망과 비관리구역 망이 계단 코어를 공유해도 되는가(비상 출구 공유), 아니면 관리구역 전용 계단이 필요한가 (R11)."
+  ]
+}

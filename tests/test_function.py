@@ -126,6 +126,59 @@ class TestHospitalCirculation(unittest.TestCase):
         self.assertEqual([x.blocks for x in v], [["SOIL"]])
 
 
+class TestEntryRules(unittest.TestCase):
+    """감사에서 드러난 문제: 장비실 문이 피난계단실로만 나거나, 화장실·창고를 거쳐 다른 실로 들어감."""
+
+    def _sp(self, **params):
+        base = {"door_m": 0.9, "via_rooms": 1, "touch_tol_m": 0.2}
+        base.update(params)
+        return spec([_corr("C1", 20.0, 2.0), _stair("S1"), _room("PUMP", 4, 4, name="PUMP ROOM"),
+                     _room("WC", 4, 4, name="TOILET"), _room("LAB", 4, 4, name="LAB")],
+                    constraints=[{"id": "CIRC-ACCESS", "params": base}])[0]
+
+    def test_no_door_into_exit_stair(self):
+        pl = {"C1": (0, 0, 0), "S1": (30, 0, 0), "PUMP": (33, 0, 0), "WC": (0, 2, 0), "LAB": (4, 2, 0)}
+        self.assertEqual(_viols(self._sp(), pl, "CIRC-ACCESS"), [])        # 계단실로만 문 — 예전엔 통과
+        v = _viols(self._sp(no_entry_types=["stair", "elevator"]), pl, "CIRC-ACCESS")
+        self.assertEqual([x.blocks for x in v], [["PUMP"]])
+        self.assertEqual(_viols(self._sp(no_entry_types=["stair"], entry_ok="PUMP"), pl, "CIRC-ACCESS"), [])
+
+    def test_no_passing_through_toilet(self):
+        pl = {"C1": (0, 0, 0), "S1": (30, 0, 0), "PUMP": (0, 2, 0), "WC": (8, 2, 0), "LAB": (8, 6, 0)}
+        self.assertEqual(_viols(self._sp(), pl, "CIRC-ACCESS"), [])        # 화장실을 거쳐 실험실 — 예전엔 통과
+        v = _viols(self._sp(no_through="TOILET"), pl, "CIRC-ACCESS")
+        self.assertEqual([x.blocks for x in v], [["LAB"]])
+
+
+class TestAdjacentDeadEnd(unittest.TestCase):
+
+    def test_adjacent_must_and_must_not(self):
+        rules = [{"a": "OR", "b": "CORE", "mode": "must", "min_touch_m": 1.0},
+                 {"a": "SOIL", "b": "CORE", "mode": "must_not"}]
+        sp = spec([_room("OR1", 6, 6, name="OR 1"), _room("CORE", 4, 6, name="CORE"), _room("SOIL", 3, 3, name="SOIL")],
+                  constraints=[{"id": "ADJACENT", "params": {"rules": rules, "touch_tol_m": 0.2}}])[0]
+        ok = {"OR1": (0, 0, 0), "CORE": (6, 0, 0), "SOIL": (20, 0, 0)}
+        self.assertEqual(_viols(sp, ok, "ADJACENT"), [])
+        bad = {"OR1": (0, 0, 0), "CORE": (12, 0, 0), "SOIL": (16, 0, 0)}
+        self.assertEqual(sorted(tuple(v.blocks) for v in _viols(sp, bad, "ADJACENT")), [("OR1",), ("SOIL", "CORE")])
+
+    def test_dead_end_corridor(self):
+        sp = spec([_corr("C1", 10.0, 2.0), _corr("C2", 10.0, 2.0), _stair("S1")],
+                  constraints=[{"id": "DEAD-END", "params": {"max_m": 15.0, "min_width_m": 1.1, "touch_tol_m": 0.2}}])[0]
+        # 계단 - C1 - C2 일렬: 출구로 이어지므로 막다른 곳 아님
+        self.assertEqual(_viols(sp, {"S1": (0, 0, 0), "C1": (3, 0, 0), "C2": (13, 0, 0)}, "DEAD-END"), [])
+        # 계단이 C1 가운데 옆에 붙고(갈림), C2 가 끝에 20 m 로 이어짐 → C2 쪽 막다른 10 m(허용), 계단 반대편 없음
+        sp2 = spec([_corr("C1", 10.0, 2.0), _corr("C2", 10.0, 2.0), _corr("C3", 10.0, 2.0), _stair("S1")],
+                   constraints=[{"id": "DEAD-END", "params": {"max_m": 15.0, "min_width_m": 1.1, "touch_tol_m": 0.2}}])[0]
+        v = _viols(sp2, {"S1": (0, 0, 0), "C1": (3, 0, 0), "C2": (13, 0, 0), "C3": (23, 0, 0)}, "DEAD-END")
+        self.assertEqual(v, [])                                # 한 줄로 계단까지 — 막다른 곳 아님
+        # 계단이 가운데 C2 옆에 붙음(갈림): 양쪽 C1·C3 가 각각 10 m 막다른 복도 — 허용 8 m 이면 둘 다 위반
+        sp3 = spec([_corr("C1", 10.0, 2.0), _corr("C2", 10.0, 2.0), _corr("C3", 10.0, 2.0), _stair("S1")],
+                   constraints=[{"id": "DEAD-END", "params": {"max_m": 8.0, "min_width_m": 1.1, "touch_tol_m": 0.2}}])[0]
+        v = _viols(sp3, {"C1": (0, 0, 0), "C2": (10, 0, 0), "C3": (20, 0, 0), "S1": (13, 2, 0)}, "DEAD-END")
+        self.assertEqual(sorted(x.blocks for x in v), [["C1"], ["C3"]])
+
+
 class TestConnectEgress(unittest.TestCase):
 
     def test_broken_corridor(self):

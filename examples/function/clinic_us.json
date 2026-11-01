@@ -1,5 +1,5 @@
 {
-  "_note": "실제 의료·치과 클리닉(미국, 2층, 업무시설 B·스프링클러 가정) — 기능 유지 요건. 치수 기준은 검증된 공개 값만 쓰고 미검증 값은 쓰지 않는다. 단 via_rooms·벽 두께 허용치는 모델링 가정이다. 규칙이 없는 실(치과 진료실·사무실·대기실 등)은 줄이지 않는다.",
+  "_note": "실제 의료·치과 클리닉(미국, 2층, 업무시설 B·스프링클러 가정) — 기능 유지 요건. 치수 기준은 검증된 공개 값만 쓰고 미검증 값은 쓰지 않는다. 단 via_rooms·벽 두께 허용치는 모델링 가정이다. 규칙이 없는 실(치과 진료실·사무실·대기실 등)은 줄이지 않는다. 외곽 크기 한도는 두지 않는다 — 부지 경계가 아니라 현재 건물 크기였을 뿐이고, 목표는 전체 면적을 현재보다 줄이는 것이다(소유자 확인 2026-11-02).",
   "_sources": {
     "IBC": "IBC 2021 Ch.10 (UpCodes, 무수정 주 채택본: CT·IL·WI) — 1007.1.1, 1010.1.1, Table 1017.2, Table 1020.3",
     "ADA": "2010 ADA Standards (access-board.gov) — 304.3.1, 404.2.3",
@@ -46,9 +46,14 @@
           "door_m": 0.813,
           "via_rooms": 2,
           "touch_tol_m": 1.0,
-          "exterior_access": "YARD|TRASH|RECEIV|GAS STOR|MECH"
+          "exterior_access": "YARD|TRASH|RECEIV|GAS STOR|MECH",
+          "no_through": "TOILET|JAN|STO\\.|STOR|CL\\.|ELEC|COMM\\. ROOM|MECH|TRASH|SOIL|LIN\\.|HAZ|FLAMABLE|GAS|KITCHENET|CLEAN SUP|CLEAN U\\.|ELEV\\. EQUIP|ADP|COMPUTER ROOM|RECORDS|DEVELOPING|PARTS|CENTRAL ISSUE|DECON",
+          "no_entry_types": [
+            "stair",
+            "elevator"
+          ]
         },
-        "_why": "문 순폭 32 in (0.813 m) = IBC 2021 §1010.1.1 / ADA §404.2.3. via_rooms 2 = 진료 스위트 안의 실(모델링 값). touch_tol 1.0 m = 벽 두께 + 다각형 근사"
+        "_why": "문 순폭 32 in (0.813 m) = IBC 2021 §1010.1.1 / ADA §404.2.3. via_rooms 2 = 진료 스위트 안의 실(모델링 값). touch_tol 1.0 m = 벽 두께 + 다각형 근사 · 창고·벽장·청소실·전기/통신/기계실·쓰레기·오염실·화장실은 다른 실의 통로가 되지 않는다 (IBC 2021 §1016.2) · 계단실·승강기는 실 출입구가 아니다 (IBC 2021 §1023.4)"
       },
       {
         "id": "CIRC-CONNECT",
@@ -56,10 +61,11 @@
           "min_width_m": 1.118,
           "touch_tol_m": 1.0,
           "must_include": [
-            "stair"
+            "stair",
+            "elevator"
           ]
         },
-        "_why": "복도 최소 폭 44 in = IBC Table 1020.3"
+        "_why": "복도 최소 폭 44 in = IBC Table 1020.3 · 2층 의료 사무소는 엘리베이터 필수 — 소규모 건물 면제 없음 (ADA 2010 §206.2.3 예외 1 단서)"
       },
       {
         "id": "EGRESS",
@@ -67,9 +73,55 @@
           "max_travel_m": 91.4,
           "min_exits": 2,
           "exit_separation_frac": 0.333,
-          "exempt": "PENTHOUSE|YARD"
+          "exempt": "PENTHOUSE|YARD|OPEN TO BELOW"
         },
         "_why": "IBC Table 1017.2 B 스프링클러 300 ft; §1006.3 층당 2개 출구; §1007.1.1 대각선 1/3 (스프링클러). 직교거리는 보행거리의 하한"
+      },
+      {
+        "id": "DEAD-END",
+        "params": {
+          "max_m": 15.24,
+          "min_width_m": 1.118,
+          "touch_tol_m": 1.0
+        },
+        "_why": "막다른 복도 50 ft(15.24 m) 이하 (IBC 2021 §1020.5, B 용도 스프링클러)"
+      },
+      {
+        "id": "ADJACENT",
+        "params": {
+          "touch_tol_m": 1.2,
+          "rules": [
+            {
+              "a": "ELEVATOR",
+              "b": "circ:corridor|lobby",
+              "mode": "must",
+              "min_touch_m": 0.914,
+              "why": "엘리베이터는 복도·로비에 열린다 — 계단실로 열지 않는다 (IBC 2021 §1023.4)"
+            },
+            {
+              "a": "1B02",
+              "b": "1B04|1B03",
+              "mode": "must",
+              "min_touch_m": 0.3,
+              "why": "검체 화장실 ↔ 검사실·채혈실 (검체 전달 창, VA PACT 지침)"
+            },
+            {
+              "a": "1D14",
+              "b": "1D12",
+              "mode": "must",
+              "min_touch_m": 0.3,
+              "why": "검체 화장실 ↔ 검체 채취실 (VA PACT 지침)"
+            },
+            {
+              "a": "2C10",
+              "b": "2C12",
+              "mode": "must",
+              "min_touch_m": 0.813,
+              "why": "치과 기구 세척(오염) ↔ 멸균(청결) — 한 방향 흐름 (CDC 치과 감염관리 지침)"
+            }
+          ]
+        },
+        "_why": "엘리베이터·검체·기구 처리 인접 (조사 R3·R13·R14)"
       }
     ],
     "weights": {
@@ -81,10 +133,41 @@
       "elev": 100000.0,
       "constraint.CIRC-ACCESS": 100000.0,
       "constraint.CIRC-CONNECT": 100000.0,
-      "constraint.EGRESS": 100000.0
+      "constraint.EGRESS": 100000.0,
+      "constraint.DEAD-END": 100000.0,
+      "constraint.ADJACENT": 100000.0
     },
     "search": {
       "warm_temperature": 0.05
     }
+  },
+  "import_options": {
+    "fit_within_existing": false
+  },
+  "_research": {
+    "file": "research/clinic_real.json",
+    "applied": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R6",
+      "R8",
+      "R13",
+      "R14"
+    ],
+    "not_modeled": [
+      "R5",
+      "R7",
+      "R9",
+      "R10",
+      "R12",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R11"
+    ],
+    "note": "R11(전기·통신·기계실 복도 직결, 가정)은 실제 건물 현황이 따르지 않아 넣지 않았다. 현황에서 걸리는 실 출입 위반 12곳은 도면에 문 위치가 없어 실을 직사각형 접촉으로만 판단하는 모델 한계다 — 예: 상담실이 화장실을 거쳐 들어가는 것으로 읽힌다. 실제 문은 다른 곳에 있다."
   }
 }

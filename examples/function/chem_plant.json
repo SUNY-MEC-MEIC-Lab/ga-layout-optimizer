@@ -1,5 +1,5 @@
 {
-  "_note": "가상 석유화학 플랜트 — 배관대를 고정에서 풀고 12 m 구간으로 나눠, 공정 설비가 쓰는 만큼만 남긴다. 공개 문헌(CCPS, GAP.2.5.2) 수치는 유료라 확인하지 못했다 — 아래 값은 가정임을 명시한다. 도로·소방차 접근로는 도면에 없어 고려하지 않았다 — 배관대 옆 통로를 접근로로 가정한다. 그래서 이 축소율은 과대평가일 수 있다.",
+  "_note": "가상 석유화학 플랜트 — 배관대를 고정에서 풀고 12 m 구간으로 나눠, 공정 설비가 쓰는 만큼만 남긴다. 공개 문헌(CCPS, GAP.2.5.2) 수치는 유료라 확인하지 못했다 — 아래 값은 가정임을 명시한다. 도로·소방차 접근로는 도면에 없어 고려하지 않았다 — 배관대 옆 통로를 접근로로 가정한다. 그래서 이 축소율은 과대평가일 수 있다. 외곽 크기 한도(현재 도면 크기)는 두지 않는다 — 목표는 전체 면적을 줄이는 것이다(소유자 확인 2026-11-02).",
   "_sources": {
     "CCPS": "CCPS Guidelines for Siting and Layout of Facilities, 2nd ed. 2018 — 공정 설비를 주 배관대 양옆에 배치(배관대 = 공정 단위의 척추). 원문 수치 미확인"
   },
@@ -10,6 +10,12 @@
         "length_m": 12.0,
         "type": "piperack",
         "basis": "배관대는 공정 설비가 붙어 있는 구간만 필요하다 — 남는 구간은 없앨 수 있게"
+      }
+    ],
+    "exterior": [
+      {
+        "match": "^CR-1",
+        "basis": "제어실은 공정 반대편 외곽 (HSE COMAH 배치 지침 — 조사 R16)"
       }
     ]
   },
@@ -36,6 +42,188 @@
       "fixed": 100000.0,
       "elev": 100000.0,
       "constraint.RACK-SERVE": 100000.0
+    },
+    "max_w": null,
+    "max_d": null
+  },
+  "_research": {
+    "file": "research/chem_plant.json",
+    "applied": [
+      "R6",
+      "R7",
+      "R8",
+      "R12",
+      "R16"
+    ],
+    "not_modeled": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R9",
+      "R10",
+      "R11",
+      "R13",
+      "R14",
+      "R15",
+      "R17"
+    ],
+    "note": "소방차 도로(R1–R5)는 도면에 도로가 없어 넣지 못했다 — 도로를 블록으로 추가하면 RACK-SERVE(rack_type road)로 검사할 수 있다."
+  },
+  "add_separations": [
+    {
+      "a": "T-101",
+      "b": "T-102",
+      "min_dist": 10.0,
+      "hard": true,
+      "basis": "HSE HSG176 (2015) Table 4 — 저장탱크 간격 10 m (조사 R7)"
+    },
+    {
+      "a": "T-101",
+      "b": "T-103",
+      "min_dist": 10.0,
+      "hard": true,
+      "basis": "HSE HSG176 (2015) Table 4 — 저장탱크 간격 10 m (조사 R7)"
+    },
+    {
+      "a": "T-102",
+      "b": "T-103",
+      "min_dist": 10.0,
+      "hard": true,
+      "basis": "HSE HSG176 (2015) Table 4 — 저장탱크 간격 10 m (조사 R7)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "PROCESS",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "COMP",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "FIRED",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "OCCUPIED",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "ELEC",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "STORAGE",
+      "b": "UTIL",
+      "min_dist": 15.0,
+      "hard": true,
+      "by_zone": true,
+      "basis": "HSE HSG176 Table 4 — 탱크 ↔ 공정·점화원·비위험 구역 15 m (조사 R8)"
+    },
+    {
+      "a": "F-101",
+      "b": "C-101",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "C-102",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "E-101",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "E-102",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "V-101",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "P-101",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "P-102",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "F-101",
+      "b": "FL-1",
+      "min_dist": 15.0,
+      "hard": true,
+      "basis": "가열로 ↔ 탄화수소 설비 15 m (가열로 설계 지침, 2차 자료 — 조사 R6; 반응기 제외)"
+    },
+    {
+      "a": "FL-1",
+      "b": "CR-1",
+      "min_dist": 18.0,
+      "hard": true,
+      "basis": "플레어 녹아웃 드럼 ↔ 제어실·탱크 18 m (2차 자료 — 조사 R12)"
+    },
+    {
+      "a": "FL-1",
+      "b": "T-101",
+      "min_dist": 18.0,
+      "hard": true,
+      "basis": "플레어 녹아웃 드럼 ↔ 제어실·탱크 18 m (2차 자료 — 조사 R12)"
+    },
+    {
+      "a": "FL-1",
+      "b": "T-102",
+      "min_dist": 18.0,
+      "hard": true,
+      "basis": "플레어 녹아웃 드럼 ↔ 제어실·탱크 18 m (2차 자료 — 조사 R12)"
+    },
+    {
+      "a": "FL-1",
+      "b": "T-103",
+      "min_dist": 18.0,
+      "hard": true,
+      "basis": "플레어 녹아웃 드럼 ↔ 제어실·탱크 18 m (2차 자료 — 조사 R12)"
     }
-  }
+  ]
 }

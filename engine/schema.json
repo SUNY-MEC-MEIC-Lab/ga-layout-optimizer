@@ -308,6 +308,10 @@
               "null"
             ],
             "description": "근거 조항. 인용 없는 수치는 IR 에 들어가면 안 된다."
+          },
+          "cross_floor": {
+            "type": "boolean",
+            "description": "층이 달라도 평면 간극으로 잰다 (공정 모듈이 거주구역 바로 위·아래에 오지 않게)"
           }
         }
       }

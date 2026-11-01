@@ -103,6 +103,7 @@ class SeparationRule:
     by_zone: bool = False
     hard: bool = True
     basis: Optional[str] = None   # 근거 조항 (추적성 표에 그대로 실린다)
+    cross_floor: bool = False     # 층이 달라도 평면 간극으로 잰다 (공정 모듈이 거주구역 바로 위에 오지 않게)
 
 
 @dataclass
@@ -465,10 +466,19 @@ class Solution:
 
         # --- (5) 외벽 접면 요구 -----------------------------------------------
         ex = 0.0
+        # 외벽 = 그 층 평면의 외곽 (층마다 따로). 건물 전체 외접 사각형으로 재면 위층이 0.4 m 더 나온 것만으로
+        # 아래층 실이 '외벽에서 떨어졌다' 가 되고, 현황 도면처럼 원점이 외곽과 다르면 모든 실이 떨어진 것이 된다.
+        fb: Dict[int, List[float]] = {}
+        for g in list(geo.values()) + list(shadows.values()):
+            b_ = fb.setdefault(g["f"], [g["x"], g["y"], g["x"] + g["w"], g["y"] + g["d"]])
+            b_[0] = min(b_[0], g["x"]); b_[1] = min(b_[1], g["y"])
+            b_[2] = max(b_[2], g["x"] + g["w"]); b_[3] = max(b_[3], g["y"] + g["d"])
         for i, g in geo.items():
             if sp.blocks[i].need_exterior:
-                dd = min(g["x"], g["y"], max(0.0, W - (g["x"] + g["w"])),
-                         max(0.0, D - (g["y"] + g["d"])))
+                x0, y0, x1, y1 = fb[g["f"]]
+                dd = max(0.0, min(g["x"] - x0, g["y"] - y0, x1 - (g["x"] + g["w"]), y1 - (g["y"] + g["d"])))
+                if dd > 1e-9 and _exposed(i, g, geo, shadows):
+                    dd = 0.0      # 외곽 사각형에는 안 닿아도 한 변이 바깥으로 트여 있다 (평면이 ㄱ·ㅁ 자일 때)
                 ex += dd
                 if dd > 1e-9:
                     bviols.append(Violation(
@@ -639,7 +649,7 @@ def separation_violation(sp: Spec, geo: Dict[int, dict], ctx: EvalContext
         for i, j in pairs:
             if i not in geo or j not in geo:
                 continue
-            if geo[i]["f"] != geo[j]["f"]:
+            if geo[i]["f"] != geo[j]["f"] and not r.cross_floor:
                 continue          # 다른 층 = 바닥슬래브로 분리 (FIRE-HATCH 가 병합을 본다)
             g = gap(rect_of(geo[i]), rect_of(geo[j]), "euclid")
             v = max(0.0, r.min_dist - g)
@@ -657,6 +667,37 @@ def separation_violation(sp: Spec, geo: Dict[int, dict], ctx: EvalContext
             else:
                 vs += v
     return vh, vs, out
+
+
+def _exposed(i: int, g: dict, geo: dict, shadows: dict, min_open: float = 1.0) -> bool:
+    """
+    실 i 의 네 변 중 하나라도, 같은 층의 다른 블록에 가리지 않은 길이가 min_open 이상이면 True.
+    (변 바깥쪽 전 방향으로 다른 블록이 없으면 그 구간은 외기에 면한다.)
+    """
+    f = g["f"]
+    others = [h for k, h in geo.items() if k != i and h["f"] == f] + \
+             [h for (k, ff), h in shadows.items() if k != i and ff == f]
+    x, y, w, d = g["x"], g["y"], g["w"], g["d"]
+    eps = 1e-6
+    for side in ("W", "E", "S", "N"):
+        if side in ("W", "E"):
+            lo, hi = y, y + d
+            blk = [(h["y"], h["y"] + h["d"]) for h in others
+                   if (h["x"] + h["w"] <= x + eps if side == "W" else h["x"] >= x + w - eps)]
+        else:
+            lo, hi = x, x + w
+            blk = [(h["x"], h["x"] + h["w"]) for h in others
+                   if (h["y"] + h["d"] <= y + eps if side == "S" else h["y"] >= y + d - eps)]
+        iv = sorted((max(lo, a), min(hi, b)) for a, b in blk if min(hi, b) > max(lo, a))
+        cov, cur = 0.0, lo
+        for a, b in iv:
+            if b <= cur:
+                continue
+            cov += b - max(a, cur)
+            cur = b
+        if (hi - lo) - cov >= min(min_open, hi - lo) - 1e-9:
+            return True
+    return False
 
 
 def hard_violations(spec: Spec, terms: Dict[str, float],
@@ -684,7 +725,8 @@ MOVES_OPT = MOVES + ("toggle_opt",)
 
 def optimize(spec: Spec, iters: int = 60000, restarts: int = 4,
              seed: int = 20260826, T0: float = None, T1: float = 1e-3,
-             verbose: bool = True, progress=None, tick=None, init: "Solution" = None):
+             verbose: bool = True, progress=None, tick=None, init: "Solution" = None,
+             keep: list = None):
     """
     SA + 다중 재시작. seed 고정으로 완전 재현 가능.
     init 이 주어지면 첫 재시작을 그 해에서 출발한다 (현황 배치 warm start).
@@ -720,6 +762,8 @@ def optimize(spec: Spec, iters: int = 60000, restarts: int = 4,
             print(f"  restart {r+1}/{restarts}: F = {bestF:,.1f}")
         if progress:
             progress(r, bestF)
+        if keep is not None:
+            keep.append((best, bestF))      # 재시작마다의 최선해 — 후보안(candidates.py)이 쓴다
         if bestF < bestF_all:
             best_all, bestF_all, hist_all = best, bestF, hist
 
@@ -789,6 +833,63 @@ def repair_penetrations(sol: Solution, F0: float = None, max_rounds: int = 4,
     if verbose:
         print(f"  관통부 정렬 수복 후: F = {bestF:,.1f}")
     return best, bestF
+
+
+def hard_amount(sol: Solution) -> Tuple[float, float, list]:
+    """(hard 위반량 합, 목적함수 F, hard 위반 목록)."""
+    F, _t, _g, _e, viols, _sh = sol.evaluate(detail=True)
+    hv = [v for v in viols if v.hard and v.amount > 1e-6]
+    return sum(v.amount for v in hv), F, hv
+
+
+def repair_hard(sol: Solution, max_rounds: int = 6, max_evals: int = 20000,
+                verbose: bool = False) -> Tuple[Solution, float]:
+    """
+    hard 위반 우선 국소 수복 (결정론적).
+
+    SA 는 hard 위반을 큰 벌점으로만 본다 — 위반 2건이 남은 해 근처에 위반 0 인 해가 있어도
+    면적 항과 섞여 그쪽으로 가지 못하는 일이 있다(병원 수술부: 위반 2 → 이 수복으로 0, 면적 그대로).
+    위반에 이름이 오른 블록만 대상으로, 같은 층 순열의 모든 삽입 위치(큰 층은 24×24 격자)·회전·
+    꺼진 optional 블록 켜기를 시도하고 (hard 합, F) 사전식으로 나아질 때만 채택한다.
+    """
+    best = sol
+    hs, F, viols = hard_amount(best)
+    n_eval = 0
+    rng0 = random.Random(0)
+    for _ in range(max_rounds):
+        if hs < 1e-9 or n_eval >= max_evals:
+            break
+        improved = False
+        ids = sorted({b for v in viols for b in v.blocks})
+        targets = [best.idx[b] for b in ids if b in best.idx and not best.spec.blocks[best.idx[b]].pinned]
+        for j in sorted(best.off):                     # 끊긴 동선은 없앤 복도 조각을 되살려 이을 수 있다
+            c = best.clone(); c.off.discard(j); c._place(j, rng0)
+            h2, F2, v2 = hard_amount(c); n_eval += 1
+            if h2 < hs - 1e-9 or (abs(h2 - hs) <= 1e-9 and F2 < F - 1e-9):
+                best, hs, F, viols, improved = c, h2, F2, v2, True
+        for i in targets:
+            if n_eval >= max_evals:
+                break
+            f = best.floor[i]
+            if i in best.off or i not in best.gp[f] or i not in best.gm[f]:
+                continue
+            n_p, n_m = len(best.gp[f]), len(best.gm[f])
+            sp_, sm_ = max(1, n_p // 24), max(1, n_m // 24)
+            for rot in ((0, 1) if best.spec.blocks[i].rotatable else (0,)):
+                for pp in range(0, n_p, sp_):
+                    for pm in range(0, n_m, sm_):
+                        c = best.clone()
+                        c.rot[i] = best.rot[i] ^ rot
+                        a = c.gp[f]; a.remove(i); a.insert(pp, i)
+                        b = c.gm[f]; b.remove(i); b.insert(pm, i)
+                        h2, F2, v2 = hard_amount(c); n_eval += 1
+                        if h2 < hs - 1e-9 or (abs(h2 - hs) <= 1e-9 and F2 < F - 1e-9):
+                            best, hs, F, viols, improved = c, h2, F2, v2, True
+        if not improved:
+            break
+    if verbose:
+        print(f"  hard 우선 수복: 평가 {n_eval}회 → hard 합 {hs:.3f}")
+    return best, best.evaluate()
 
 
 def _mutate(s: Solution, rng: random.Random):

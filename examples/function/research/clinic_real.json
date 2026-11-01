@@ -1,0 +1,526 @@
+{
+  "case": "clinic_real",
+  "summary_ko": "이 건물은 미국의 2층 외래 의료·치과 클리닉(업무시설 B, 스프링클러 가정)이다. 지금 요건은 '모든 실이 복도에서 2개 실 이내로 들어갈 수 있으면 된다'뿐이라, 화장실·창고·전기실·청소도구실을 지나 다른 실로 가거나, 기계실·전기실의 유일한 문이 피난계단으로 나는 배치도 통과한다. 미국 건축법(IBC 2021)은 창고·벽장·주방 같은 실과 잠글 수 있는 실을 통로로 쓰는 것을 금지하고(§1016.2), 피난계단실 문은 평상시 사람이 있는 공간에서 계단으로 들어가는 용도만 허용하며 엘리베이터는 계단실로 열리면 안 된다(§1023.4). 대기실·접수 공간은 클리닉에 딸린 공간이라 통로로 써도 되지만, 보이는 통로가 있어야 한다. 그 밖에 막다른 복도 50 ft 이하, 공용 피난경로 100 ft 이하, 의료기관 사무실은 2층이라도 엘리베이터가 있어야 한다는 ADA 규정, 전기실 앞 작업공간 등을 추가한다.",
+  "requirements": [
+    {
+      "id": "R1",
+      "what_ko": "창고·벽장·청소도구실(JAN)·전기/통신/기계실·쓰레기·오염실·간이주방·화장실 같은 실은 다른 실로 가는 통로가 되면 안 된다. 대기실·접수·현관(VEST)·개방형 업무 공간처럼 잠기지 않는 부속 공간만 지나갈 수 있다.",
+      "why_ko": "창고나 화장실은 문이 잠기거나 물건이 쌓여 길이 막힌다. 그 안쪽 실의 사람은 불이 나면 갇힌다. (실제 실패 예: 화장실·창고·전기실을 거쳐 다른 실로 들어감)",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "door_m": 0.813,
+        "via_rooms": 2,
+        "touch_tol_m": 1.0,
+        "through_ok": "WAIT|RECEPT|VEST|ACTIVITY|CUBICLES|TEAM INTERACTION|ADMIN WORK|TECH\\. WORK|WORK ROOM|DTR SUPPORT|ADMIN\\. RECEPT",
+        "through_forbid_proposed": "TOILET|JAN|STO\\.|STOR|CL\\.|ELEC|COMM\\. ROOM|MECH|TRASH|SOIL|LIN\\.|HAZ|FLAMABLE|GAS|KITCHENET|CLEAN SUP|CLEAN U\\.|ELEV\\. EQUIP|ADP|COMPUTER ROOM|RECORDS|DEVELOPING|PARTS|CENTRAL ISSUE"
+      },
+      "targets": "모든 room. 통과 금지 예: 1A11, 1B08, 1B12, 1B14, 1B16, 1B21, 1B23, 1C03, 1C06, 1C11-*, 1C13, 1D01, 1D03, 1D17, 1D24, 1D37, 1D39, 1E01–1E03, 1E14–1E27, 1E30, 2B12–2B14, 2B17, 2B2, 2B20, 2B25, 2C05, 2C13, 2C15, 2C18, 2C19, 2D01, 2D02, 2D04A, 2D05, 모든 TOILET",
+      "source": {
+        "title": "IBC 2021 §1016.2 Egress through intervening spaces (Illinois 2021 무수정 채택본, UpCodes)",
+        "section": "1016.2 items 2, 3, 5",
+        "url": "https://up.codes/s/egress-through-intervening-spaces",
+        "quote": "Egress shall not pass through kitchens, storage rooms, closets or spaces used for similar purposes. / An exit access shall not pass through a room that can be locked to prevent egress."
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (현재 through_ok 없음 → 어떤 실이든 통과 가능). 화장실을 '잠글 수 있는 실'로 보는 것은 일반적 해석. 엔진은 허용 목록(through_ok)만 있으므로 금지 목록 파라미터(through_forbid) 신설 제안. 현황 도면의 스위트 내부 통과가 늘어날 수 있어 현황 재검증 필요"
+    },
+    {
+      "id": "R2",
+      "what_ko": "피난계단실은 실의 출입구가 될 수 없다. 모든 실은 복도·로비·대기실(동선)로 들어가야 하고, 계단실을 통해서만 들어가는 실(특히 전기실·기계실·창고·화장실·엘리베이터 기계실)은 금지.",
+      "why_ko": "계단실은 화재 때 연기가 들어오지 않아야 하는 피난 통로다. 기계실·전기실 문이 계단으로 나면 불·연기가 계단으로 번지고, 평소엔 계단실이 창고 통로처럼 쓰인다. (실제 실패 예: 펌프실·스위치기어실의 유일한 문이 계단실)",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "circulation_types": [
+          "corridor",
+          "lobby"
+        ],
+        "note": "stair·elevator 를 실 출입용 동선에서 뺀다. 계단·엘리베이터 자체는 CIRC-CONNECT 로 복도망에 붙어 있게 한다"
+      },
+      "targets": "모든 room (1AS1, 1BS2, 1CS3 및 위층 계단과 맞닿은 실)",
+      "source": {
+        "title": "IBC 2021 §1023.4 Openings (CBC 1023.4 = IBC 동일 문구, gocodebook)",
+        "section": "1023.4",
+        "url": "https://gocodebook.com/library/us/ca/ca-building-code/chapter-10-means-of-egress/section-1023-interior-exit-stairways-and-ramps",
+        "quote": "shall be limited to those required for exit access to the enclosure from normally occupied spaces ... Elevators shall not open into interior exit stairways and ramps."
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "값 변경 (현재 circulation_types 기본값에 stair 포함 → 계단으로만 드나드는 실도 통과)"
+    },
+    {
+      "id": "R3",
+      "what_ko": "엘리베이터는 층마다 복도나 로비에 직접 면해야 하고 계단실로 열리면 안 된다.",
+      "why_ko": "엘리베이터가 계단실로 열리면 승강로를 통해 연기가 계단으로 들어오고, 휠체어 이용자가 내릴 곳이 계단 안이 된다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "a": "ELEVATOR",
+        "b": "circulation:corridor|lobby",
+        "min_contact_m": 0.914,
+        "each_floor": true,
+        "forbid_only_contact_with": "circulation:stair"
+      },
+      "targets": "E1 (모든 층)",
+      "source": {
+        "title": "IBC 2021 §1023.4 (CBC 동일 문구)",
+        "section": "1023.4",
+        "url": "https://gocodebook.com/library/us/ca/ca-building-code/chapter-10-means-of-egress/section-1023-interior-exit-stairways-and-ramps",
+        "quote": "Elevators shall not open into interior exit stairways and ramps."
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "새로 추가 (min_contact 0.914 m = 36 in 엘리베이터 문 — 가정, 원문 대조 필요)"
+    },
+    {
+      "id": "R4",
+      "what_ko": "의료기관 사무실(클리닉)은 2층 건물이라도 층과 층을 잇는 접근 가능 경로(엘리베이터)가 반드시 있어야 한다. 엘리베이터를 없애거나 한 층만 서게 만들면 안 된다.",
+      "why_ko": "ADA 의 '3층 미만 소규모 건물 엘리베이터 면제'는 의료기관 사무실에는 적용되지 않는다. 엘리베이터가 없으면 2층 치과에 휠체어 환자가 갈 수 없다.",
+      "rule": "CIRC-CONNECT",
+      "params": {
+        "min_width_m": 1.118,
+        "touch_tol_m": 1.0,
+        "must_include": [
+          "stair",
+          "elevator"
+        ],
+        "elevator_floors": [
+          0,
+          1
+        ]
+      },
+      "targets": "E1 — 블록 목록상 f0 에만 있음 → f1 에도 쌓여(stack) 있어야 함",
+      "source": {
+        "title": "2010 ADA Standards §206.2.3 Exception 1 (access-board.gov)",
+        "section": "206.2.3",
+        "url": "https://www.access-board.gov/ada/",
+        "quote": "At least one accessible route shall connect each story and mezzanine in multi-story buildings and facilities. (Exception 1 은 'the professional office of a health care provider' 에 적용 안 됨)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "값 변경 (must_include 에 elevator 추가)"
+    },
+    {
+      "id": "R5",
+      "what_ko": "대기실·접수 공간(lobby 로 분류된 실)은 통로로 써도 된다. 단 이 공간을 지나는 길이 눈에 보이고 막히지 않아야 하므로, 대기실은 복도와 '복도 폭 이상'으로 이어져야 하고 대기실 안에서도 복도 폭만큼의 통로가 남아야 한다.",
+      "why_ko": "대기실은 클리닉의 부속 공간이라 법이 통과를 허용하지만, 의자가 꽉 찬 좁은 대기실을 주 동선으로 쓰면 실제로 지나갈 수 없다.",
+      "rule": "CIRC-CONNECT",
+      "params": {
+        "circulation_types": [
+          "corridor",
+          "stair",
+          "elevator",
+          "lobby"
+        ],
+        "lobby_min_contact_m": 1.118,
+        "lobby_min_clear_dim_m": 1.118
+      },
+      "targets": "1A01, 1AC1, 1B01, 1B13, 1C01, 1C02, 1D33, 1DC1, 2A10, 2A11, 2B10, 2B11, 2B15",
+      "source": {
+        "title": "IBC 2021 §1016.2 item 2 (Illinois 2021, UpCodes)",
+        "section": "1016.2 item 2",
+        "url": "https://up.codes/s/egress-through-intervening-spaces",
+        "quote": "Egress from a room or space shall not pass through adjoining or intervening rooms or areas (요약: 단, 부속 용도이고 H 용도가 아니며 식별 가능한 피난경로가 있으면 허용)"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "이미 있음 (로비를 동선으로 인정). 로비 접면·최소 치수 조건은 새로 추가 — 44 in 는 Table 1020.3 일반 복도 폭을 차용(가정)"
+    },
+    {
+      "id": "R6",
+      "what_ko": "피난: 어느 실에서든 계단까지 300 ft(91.4 m) 이하, 층당 계단 2개 이상, 두 계단은 층 대각선의 1/3 이상 떨어져야 한다. 위층 계단은 1층까지 끊기지 않고 이어져야 한다.",
+      "why_ko": "계단을 줄이거나 한쪽에 몰면 불이 난 쪽 계단을 못 쓸 때 대피할 곳이 없다.",
+      "rule": "EGRESS",
+      "params": {
+        "max_travel_m": 91.4,
+        "min_exits": 2,
+        "exit_separation_frac": 0.333,
+        "exempt": "PENTHOUSE|YARD|OPEN TO BELOW",
+        "ground_floor": 0
+      },
+      "targets": "모든 실, 계단 1AS1·1BS2·1CS3 (및 위층)",
+      "source": {
+        "title": "IBC 2021 Table 1017.2 (B 스프링클러 300 ft), §1006.3, §1007.1.1",
+        "section": "Table 1017.2, 1006.3, 1007.1.1",
+        "url": "https://gocodebook.com/library/us/ca/ca-building-code/chapter-10-means-of-egress/section-1017-exit-access-travel-distance",
+        "quote": "(검색 요약: B = 200 ft 비스프링클러 / 300 ft 스프링클러)"
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "이미 있음. exempt 에 OPEN TO BELOW 추가"
+    },
+    {
+      "id": "R7",
+      "what_ko": "공용 피난경로: 실에서 출발해 '서로 다른 두 출구로 갈라지는 지점'까지 100 ft(30.5 m) 이하. 재실 50명 이상인 실(대기실·회의실 등)은 출입문이 2개 이상.",
+      "why_ko": "한 갈래 길이 길면 그 길이 막혔을 때 대안이 없다. 복도를 줄이면 이런 외길이 길어진다.",
+      "rule": "NEW:COMMON-PATH",
+      "params": {
+        "max_common_path_m": 30.48,
+        "two_doors_if_occupants_ge": 50,
+        "occupant_density_m2_per_person": "IBC Table 1004.5 B 150 gross sf/인 (원문 미확인 — 입력 전 대조)"
+      },
+      "targets": "모든 실; 2도어 대상 후보 1AC1 CENTRAL WAITING, 1DC1, 2A01, 2B3, 2D20, 2D21",
+      "source": {
+        "title": "IBC 2021 Table 1006.2.1 (Wisconsin 2021 채택본, UpCodes — 표 열이 깨져 보임)",
+        "section": "1006.2.1, Table 1006.2.1",
+        "url": "https://up.codes/viewer/wisconsin/ibc-2021/chapter/10/means-of-egress",
+        "quote": "Two exits or exit access doorways from any space shall be provided where the design occupant load or the common path ... (B: 49 / 100 / 75 / 100a)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R8",
+      "what_ko": "막다른 복도(출구로 한쪽만 이어진 구간)는 50 ft(15.2 m) 이하 (스프링클러 B). 폭의 2.5배보다 짧은 구간은 제한 없음.",
+      "why_ko": "필요 없는 복도 구간을 지우다 보면 긴 막다른 골목이 생겨 그 끝 실 사람이 되돌아 나와야 한다.",
+      "rule": "NEW:DEAD-END",
+      "params": {
+        "max_dead_end_m": 15.24,
+        "exempt_if_len_lt_width_x": 2.5
+      },
+      "targets": "모든 CORRIDOR 블록 (optional_corridors=true 이므로 특히 중요)",
+      "source": {
+        "title": "IBC 2021 §1020.5 Dead ends, Exception 2 (Illinois 2021, UpCodes)",
+        "section": "1020.5",
+        "url": "https://up.codes/s/dead-ends",
+        "quote": "the length of the dead-end corridors shall not exceed 50 feet (15 240 mm)"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R9",
+      "what_ko": "복도 최소 폭 44 in(1.118 m), 휠체어 회전을 위해 복도 폭 60 in(1.525 m)로 설계. 실 출입문 순폭 32 in(0.813 m).",
+      "why_ko": "복도·문이 좁으면 휠체어·들것이 못 지나간다.",
+      "rule": "CIRC-CONNECT",
+      "params": {
+        "min_width_m": 1.118,
+        "corridor_width_m": 1.525,
+        "door_m": 0.813
+      },
+      "targets": "모든 CORRIDOR",
+      "source": {
+        "title": "IBC 2021 Table 1020.3; §1010.1.1 (Illinois 2021, UpCodes); ADA 2010 §304.3.1",
+        "section": "Table 1020.3, 1010.1.1, ADA 304.3.1",
+        "url": "https://up.codes/s/size-of-doors",
+        "quote": "shall provide a minimum clear opening width of 32 inches (813 mm)"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "이미 있음. (참고: VA PACT 지침은 클리닉 복도 6 ft 이상 권장 — 채택 여부는 소유자)"
+    },
+    {
+      "id": "R10",
+      "what_ko": "전기실(ELEC. ROOM·ELECTRICAL)은 분전반 앞에 작업공간이 있을 만큼 커야 한다: 장비 앞 깊이 0.9 m(150 V 이하)~1.2 m(151–600 V), 폭은 장비 폭 또는 0.76 m 중 큰 값. 작업공간에는 물건을 두지 않는다. 1200 A 이상·폭 6 ft 초과 장비면 작업공간 양 끝에 출입구가 하나씩 있어야 한다.",
+      "why_ko": "전기실을 줄이면 문을 열고 들어가도 패널 앞에 설 자리가 없어 점검·차단 작업 중 감전 사고가 난다.",
+      "rule": "NEW:SERVICE-CLEARANCE",
+      "params": {
+        "targets": "ELEC\\. ROOM|ELECTRICAL",
+        "front_clear_depth_m": 0.9,
+        "front_clear_depth_m_151_600V": 1.2,
+        "min_width_m": 0.762,
+        "equipment_depth_m": 0.6,
+        "two_entrances_if": "≥1200 A 이고 장비 폭 > 1.83 m"
+      },
+      "targets": "1B23, 1E19, 2B13, 2C18 (1C11 ELEC. CL. 은 벽부형 패널 — 앞 공간은 복도로 확보)",
+      "source": {
+        "title": "OSHA 29 CFR 1910.303(g)(1) (NEC 110.26 과 같은 체계)",
+        "section": "1910.303(g)(1)(i)–(iv), Table S-1",
+        "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.303",
+        "quote": "Working space required by this standard may not be used for storage. ... shall be the width of the equipment or 762 mm (30 in.), whichever is greater."
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "새로 추가 (room_sizes 의 ELEC 최소 치수로 근사). 장비 깊이 0.6 m 는 도면의 '600mm Depth' 블록에서 가져온 가정"
+    },
+    {
+      "id": "R11",
+      "what_ko": "전기실·통신실·기계실·엘리베이터 기계실은 복도(또는 외부)로 직접 문이 나야 한다. 다른 실 안쪽에 두거나 계단실로 문을 내면 안 된다.",
+      "why_ko": "점검원이 진료실·사무실을 지나 들어가야 하면 점검이 안 되고, 고장 때 차단하러 가기 어렵다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "direct": "ELEC\\. ROOM|ELECTRICAL|COMM\\. ROOM|MECH|ELEV\\. EQUIP|ADP EQUIP|COMPUTER ROOM",
+        "exterior_access": "YARD|TRASH|RECEIV|GAS STOR|MECH"
+      },
+      "targets": "1B21, 1B23, 1C13, 1E02, 1E15, 1E19, 1E25, 2B12, 2B13, 2C15, 2C18, 2D04A, 2D05",
+      "source": {
+        "title": "OSHA 1910.303(g)(1)(iii) + IBC 1023.4",
+        "section": "1910.303(g)(1)(iii)",
+        "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.303",
+        "quote": "At least one entrance of sufficient area shall be provided to give access to the working space"
+      },
+      "status": "assumed",
+      "priority": "high",
+      "changes_today": "새로 추가. OSHA 는 '출입구가 있을 것'만 요구 — '복도에 직접'은 공학적 가정(다른 실을 지나는 출입도 법상 가능하나 R1 과 결합하면 사실상 직접 접면이 필요)"
+    },
+    {
+      "id": "R12",
+      "what_ko": "환자용 화장실은 진료 구역의 복도나 대기실에서 바로 들어가야 한다(직원 구역·진료실을 거치지 않게). 화장실 짧은 변 ≥ 60 in(1.525 m) — 휠체어 회전.",
+      "why_ko": "환자가 직원 공간을 지나 화장실에 가면 사생활·보안 문제가 생기고, 좁은 화장실은 휠체어로 쓸 수 없다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "direct": "^(?!.*STAFF).*TOILET"
+      },
+      "targets": "1A09, 1A12, 1C12, 1D04, 1D18, 1D26, 1E09, 1E10, 1E12, 2B22, 2B5, 2C23, 2C24, 2D13 (STAFF TOILET 은 제외)",
+      "source": {
+        "title": "ADA 2010 §213.2, §603.2.1/§304.3.1; VA PACT Space Module Design Guide 2015 §4.4",
+        "section": "213.2; 304.3.1",
+        "url": "https://www.access-board.gov/ada/",
+        "quote": "Where toilet rooms are provided, each toilet room shall comply with 603."
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "새로 추가. 치수는 verified(ADA), '복도에서 직접'은 가정(진료실 전용 화장실 1D05 처치실 등은 via 허용)"
+    },
+    {
+      "id": "R13",
+      "what_ko": "검체 화장실(SPECIMEN TOILET)은 검사실(LAB)·채혈실·검체채취실과 맞닿아 있어야 한다 (검체 전달용 pass-through).",
+      "why_ko": "검체를 들고 대기실·복도를 지나가면 사생활 침해와 검체 오염이 생긴다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "pairs": [
+          [
+            "1B02",
+            "1B04|1B03"
+          ],
+          [
+            "1D14",
+            "1D12"
+          ]
+        ],
+        "min_contact_m": 0.3
+      },
+      "targets": "1B02 ↔ 1B04 LAB/1B03 BLOOD DRAW, 1D14 ↔ 1D12 SPECIMEN COLL. LAB",
+      "source": {
+        "title": "VA PACT Space Module Design Guide (2015) §4.4 Patient Toilet; Massachusetts DPH OP2 checklist (FGI 2022 기반 — 검색 요약)",
+        "section": "4.4",
+        "url": "https://www.wbdg.org/FFC/VA/VADEGUID/dgpact.pdf",
+        "quote": "Provide a specimen pass-through (optional) to the Utility Room in the PACT Space Module Supply Core"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가 (VA 는 'optional', FGI 원문 미확인 — 현황 도면이 이미 이렇게 되어 있어 기능 유지 차원)"
+    },
+    {
+      "id": "R14",
+      "what_ko": "오염실(SOIL. UTL., SOIL. LIN., DIPC DECON)과 청결 공급실(CLEAN U., CLEAN SUP., DIPC CLEAN)은 서로 다른 실이어야 하며, 오염실은 청결실을 거쳐 들어가면 안 된다. 치과 기구 세척(DECON)→멸균(CLEAN)은 한 방향으로 이어지는 맞닿은 배치.",
+      "why_ko": "청결 물품과 오염 물품이 같은 길을 쓰면 감염이 퍼진다. 치과 기구는 세척실에서 멸균실로만 흘러야 한다.",
+      "rule": "NEW:ADJACENT-REQUIRED",
+      "params": {
+        "pairs": [
+          [
+            "2C10",
+            "2C12"
+          ]
+        ],
+        "min_contact_m": 0.813,
+        "plus": "CIRC-ACCESS through_forbid 에 SOIL|DECON 포함, CLEAN U.·SOIL 은 corridor 직접(direct)"
+      },
+      "targets": "2C10 DIPC DECON ↔ 2C12 DIPC CLEAN; 1B12/1B14, 1D03/1D01, 1D37, 1C06, 2B25, 1E30",
+      "source": {
+        "title": "VA PG-18-9 Ch.286 8.A.8 (수술부 — 클리닉 유추 적용); VA PACT Guide 'Supply Core'",
+        "section": "8.A.8",
+        "url": "https://www.cfm.va.gov/til/space/SPchapter286.pdf",
+        "quote": "Separate the flow of clean medical supplies, instruments, and linen from soiled and unused materials to prevent cross-contamination."
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가 (치과 DECON–CLEAN 맞닿음은 업계 관행 — 원문은 수술부 지침을 유추)"
+    },
+    {
+      "id": "R15",
+      "what_ko": "인화성·위험물·가스 저장실(FLAMABLE STORAGE, HAZ. STOR., GAS STORAGE)은 1층 외벽에 면해야 한다.",
+      "why_ko": "건물 안쪽 깊이 두면 누출·화재 때 환기·소방 진입이 어렵고, 가스 실린더 반입이 복도를 지난다.",
+      "rule": "EXTERIOR",
+      "params": {
+        "need_exterior": true,
+        "floor": 0
+      },
+      "targets": "1E15-A GAS STORAGE, 1E17 HAZ. STOR., 1E21 FLAMABLE STORAGE",
+      "source": {
+        "title": "(근거 미확인 — NFPA 99/NFPA 55 의료가스 저장 위치는 유료 표준)",
+        "section": "-",
+        "url": "",
+        "quote": ""
+      },
+      "status": "assumed",
+      "priority": "low",
+      "changes_today": "새로 추가 (GAS STOR 는 현재 exterior_access 로만 다룸 — 외벽 '필수'로 강화하는 것은 가정)"
+    },
+    {
+      "id": "R16",
+      "what_ko": "1층 계단은 외부로 바로 나가야 한다. 로비를 거쳐 나가는 계단은 전체 출구의 절반까지만.",
+      "why_ko": "계단에서 내려와 다시 실내를 한참 지나야 밖으로 나간다면 1층 화재 때 피난이 막힌다.",
+      "rule": "NEW:EXIT-DISCHARGE",
+      "params": {
+        "stairs_on_ground": "circulation:stair, floor 0",
+        "need_exterior_or_lobby": true,
+        "max_fraction_via_lobby": 0.5
+      },
+      "targets": "1AS1, 1BS2, 1CS3",
+      "source": {
+        "title": "IBC 2021 §1028.2 Exit discharge, Exception 1 (원문 미확인)",
+        "section": "1028.2",
+        "url": "",
+        "quote": ""
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "새로 추가. 조항 번호·50% 값은 원문 대조 전이라 assumed"
+    },
+    {
+      "id": "R17",
+      "what_ko": "(권고) 환자 동선(on-stage)과 직원·물품 동선(off-stage)을 나눈다: 직원 휴게실·직원 화장실·검사실·약국 조제실은 환자 대기실을 거쳐 들어가지 않는다.",
+      "why_ko": "섞이면 소음·혼잡·사생활 문제가 생기고 직원 안전(난폭 환자)도 떨어진다. 법정 요건은 아니다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "corridor_for_proposed": [
+          [
+            "STAFF|LOUNGE|LAB$|PHARM\\. DISP|BENCHSTOCK|HK ",
+            "circulation:corridor"
+          ]
+        ],
+        "soft": true
+      },
+      "targets": "1A10, 1A13, 1A16, 1B04, 1B10, 1B11, 1E04, 1E11, 2C07, 2C08, 2C22",
+      "source": {
+        "title": "VA PACT Space Module Design Guide (2015) §4.2, §5.1.4",
+        "section": "4.2 Guidelines for Patient and Staff Flows",
+        "url": "https://www.wbdg.org/FFC/VA/VADEGUID/dgpact.pdf",
+        "quote": "Separate patient and staff flows utilizing a dual corridor design. Provide \"on-stage\" and \"off-stage\" areas"
+      },
+      "status": "verified",
+      "priority": "low",
+      "changes_today": "새로 추가 (권고 — soft 가중치 권장)"
+    },
+    {
+      "id": "R18",
+      "what_ko": "진료실·처치실 최소 크기 (진료실 80 sf·최소 8 ft, 처치실 120 sf·최소 10 ft), 처치실·여성검진실에 딸린 전용 화장실은 그 실에서 직접 들어간다.",
+      "why_ko": "진료대 옆 작업 공간이 없으면 진료를 못 하고, 처치 후 환자가 복도를 지나 화장실을 가면 안 된다.",
+      "rule": "CIRC-ACCESS",
+      "params": {
+        "room_sizes": "기존 exam/treatment 규칙 유지",
+        "via_rooms": 2
+      },
+      "targets": "INTERACTION STATION, EXAM, TRMT, 1D05/1D04 등",
+      "source": {
+        "title": "FGI OP 2018 2.1-3.2.1.2 (기존 요건 근거); VA PACT Guide §4.3 Procedure Room",
+        "section": "2.1-3.2.1.2; 4.3",
+        "url": "https://www.wbdg.org/FFC/VA/VADEGUID/dgpact.pdf",
+        "quote": "Locate a dedicated patient toilet accessed directly from the Procedure Room at approximately 60 sq. ft."
+      },
+      "status": "secondary",
+      "priority": "low",
+      "changes_today": "이미 있음 (크기). 전용 화장실 직접 연결은 R1 의 TOILET 통과 금지와 함께 '목적지로서의 via' 는 허용됨을 명시"
+    }
+  ],
+  "room_sizes": [
+    {
+      "match": "EXAM|INTERACTION STATION|SCREEN EYE|ECG TEST|BLOOD DRAW|IMMUNIZ",
+      "min_area_m2": 7.43,
+      "min_clear_dim_m": 2.44,
+      "basis": "기존 유지: FGI OP 2018 2.1-3.2.1.2 80 sf / CBC 1224.4.4.1.1 8 ft",
+      "url": "https://www.fgiguidelines.org/wp-content/uploads/2019/02/FGI-interps_Guidelines_2018_OP_190123.pdf",
+      "status": "secondary"
+    },
+    {
+      "match": "TRMT|TREATMENT|PROCEDURE",
+      "min_area_m2": 11.15,
+      "min_clear_dim_m": 3.05,
+      "basis": "기존 유지: CBC 2022 1224.4.4.1.2 120 sf, 10 ft",
+      "url": "https://up.codes/",
+      "status": "secondary"
+    },
+    {
+      "match": "TOILET",
+      "min_clear_dim_m": 1.525,
+      "basis": "ADA 2010 §304.3.1 회전 지름 60 in, §604.3.1 변기 주변 60 in 폭",
+      "url": "https://www.access-board.gov/ada/",
+      "status": "verified"
+    },
+    {
+      "match": "ELEC\\. ROOM|ELECTRICAL",
+      "min_clear_dim_m": 1.5,
+      "basis": "OSHA 1910.303(g)(1) Table S-1 작업공간 깊이 0.9 m + 패널 깊이 0.6 m(도면 '600mm Depth' 가정). 151–600 V 장비면 1.8 m",
+      "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.303",
+      "status": "assumed"
+    },
+    {
+      "match": "CORRIDOR",
+      "min_clear_dim_m": 1.118,
+      "basis": "IBC 2021 Table 1020.3 44 in (재실 50 이상). VA PACT 권장 6 ft(1.83 m)는 참고",
+      "url": "https://www.wbdg.org/FFC/VA/VADEGUID/dgpact.pdf",
+      "status": "secondary"
+    }
+  ],
+  "new_rule_types": [
+    {
+      "name": "CIRC-ACCESS.through_forbid (파라미터 추가)",
+      "semantics_ko": "BFS 로 실 r 까지의 출입 경로를 찾을 때, 중간에 지나는 실(r 자신 제외)이 through_forbid 정규식에 맞으면 그 간선을 못 쓴다. 목적지로서는 허용(진료실 안 화장실 OK, 화장실을 거쳐 진료실은 금지).",
+      "params": {
+        "through_forbid": "통과 금지 실 이름 정규식"
+      }
+    },
+    {
+      "name": "ADJACENT-REQUIRED",
+      "semantics_ko": "지정 쌍(또는 a 정규식 각 블록과 b 정규식 블록)이 같은 층에서 간극 ≤ touch_tol, 맞닿은 변 길이 ≥ min_contact_m. each_floor=true 면 층마다. forbid_only_contact_with: 맞닿은 동선이 그 유형뿐이면 위반.",
+      "params": {
+        "a": "정규식/id",
+        "b": "정규식/id 또는 circulation:유형",
+        "pairs": "[[a,b],…]",
+        "min_contact_m": "m"
+      }
+    },
+    {
+      "name": "COMMON-PATH",
+      "semantics_ko": "동선 그래프에서 각 실 중심부터, 두 개의 서로 다른 출구로 가는 노드-분리 경로가 처음 갈라지는 노드까지의 직교 경로 길이 ≤ max_common_path. 실 면적/밀도로 재실자 수를 구해 ≥ 임계면 그 실의 동선 접면(문 후보)이 2곳 이상이고 서로 대각선 1/3 이상 떨어져야 한다.",
+      "params": {
+        "max_common_path_m": "m",
+        "two_doors_if_occupants_ge": "인",
+        "occupant_density_m2_per_person": "m²/인 (인용)"
+      }
+    },
+    {
+      "name": "DEAD-END",
+      "semantics_ko": "층마다 동선 블록 그래프에서 출구(계단·외부 접면 로비)로의 경로가 하나뿐인 말단 사슬을 찾아 그 축 방향 길이를 합산. 길이 > max 이고 길이 ≥ 2.5×폭이면 초과분 m 를 위반량.",
+      "params": {
+        "max_dead_end_m": "m",
+        "exempt_if_len_lt_width_x": "배수"
+      }
+    },
+    {
+      "name": "SERVICE-CLEARANCE",
+      "semantics_ko": "대상 실의 짧은 변 ≥ equipment_depth + front_clear_depth, 긴 변 ≥ max(min_width, 장비 폭). two_entrances 조건이면 동선과 맞닿은 변 두 곳(서로 다른 끝)에 문 폭 이상 접면.",
+      "params": {
+        "front_clear_depth_m": "m",
+        "equipment_depth_m": "m",
+        "min_width_m": "m"
+      }
+    },
+    {
+      "name": "EXIT-DISCHARGE",
+      "semantics_ko": "피난층(ground_floor)의 각 계단 블록이 층 외곽(envelope)에 접하거나, 외곽에 접한 lobby 블록에 맞닿아야 한다. lobby 경유 계단 수 / 전체 계단 수 ≤ max_fraction_via_lobby.",
+      "params": {
+        "max_fraction_via_lobby": "비율"
+      }
+    }
+  ],
+  "not_layout_related": [
+    "X-ray·치과 X-ray 실 차폐(NCRP 147/주 방사선 규정) — 벽체 사양",
+    "검체 화장실 음압·환기 10 ACH (FGI/ASHRAE 170)",
+    "피난계단실 내화등급·문 자동닫힘(IBC 716·1023.2)",
+    "ADA 문 앞 기동 공간(§404.2.4), 손잡이·세면대 높이 등 세부 치수",
+    "의료가스 실린더 수량별 저장 방식(NFPA 99/55)",
+    "개방형 계단/흡입구 'OPEN TO BELOW' 3층 블록 — 공간 기능 없음, 배치 대상 아님"
+  ],
+  "open_questions": [
+    "엘리베이터 E1 이 블록 목록상 1층에만 있다. 2층(치과)에도 서는가? (ADA §206.2.3 상 필수)",
+    "스프링클러가 건물 전체에 있는가? (피난거리 300 ft·막다른 복도 50 ft·계단 간격 1/3 은 모두 스프링클러 전제)",
+    "1층 A~E 구역과 2층 치과·행정은 한 운영자(단일 tenant)인가? 다른 tenant 이면 IBC 1016.2.1 에 따라 다른 tenant 공간을 지나 피난하면 안 된다.",
+    "전기실 장비의 전압·정격 전류(1200 A 이상이면 출입구 2개)와 패널 폭",
+    "환자용/직원용 화장실 구분: 이름에 STAFF 가 없는 TOILET 은 모두 환자·공용으로 봐도 되는가?",
+    "50명 이상 모이는 실(대기실·회의실·강의실)의 실제 좌석 수",
+    "VA PACT 식 이중 복도(on-stage/off-stage)를 목표로 하는가, 현행 단일 복도를 유지하는가?"
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "_note": "실제 연구소 건물(독일, KIT 공개 BIM) — 기능 유지 요건. 1인 사무실만 ASR 기준으로 맞추고, 인원을 모르는 실(학생 사무실·실험실·세미나실)은 줄이지 않는다.",
+  "_note": "실제 연구소 건물(독일, KIT 공개 BIM) — 기능 유지 요건. 1인 사무실만 ASR 기준으로 맞추고, 인원을 모르는 실(학생 사무실·실험실·세미나실)은 줄이지 않는다. 외곽 크기 한도는 두지 않는다 — 부지 경계가 아니라 현재 건물 크기였을 뿐이고, 목표는 전체 면적을 현재보다 줄이는 것이다(소유자 확인 2026-11-02).",
   "_sources": {
     "ASR A1.2": "ASR A1.2 Raumabmessungen und Bewegungsflächen §5(3)(4) — BGN 공식본 미러 (09/2013, 2022 개정)",
     "ASR A1.8": "ASR A1.8 Verkehrswege 표 2",
@@ -11,7 +11,8 @@
       "^IFCFURNISHINGELEMENT": "ignore",
       "^IFCFLOWTERMINAL": "ignore",
       "^IFCBUILDINGELEMENTPROXY": "ignore"
-    }
+    },
+    "fit_within_existing": false
   },
   "program": {
     "stack_cores": true,
@@ -31,11 +32,30 @@
       },
       {
         "type": "office_1p",
-        "match": "^Buero (?!Studenten)",
+        "match": "^Buero (?!Studenten|IL)",
         "min_area_m2": 8.0,
         "target_area_m2": 10.0,
         "min_clear_dim_m": 2.0,
-        "basis": "ASR A1.2 §5(3) 최소 8 m², §5(4) 셀 사무실 지침 8–10 m²/인 → 10 m². 최소 치수 2.0 m 는 가정(책상 + 1.0 m 이동 폭, §5.1)"
+        "basis": "ASR A1.2 §5(3) 최소 8 m², §5(4) 셀 사무실 지침 8–10 m²/인 → 10 m². 최소 치수 2.0 m 는 가정(책상 + 1.0 m 이동 폭, §5.1) · 소장실(Buero IL)은 용도 확인 전까지 제외 (조사 R19)"
+      },
+      {
+        "type": "work_min",
+        "match": "^(Labor|Besprechung|Seminar|Buero Studenten)",
+        "min_area_m2": 8.0,
+        "grow_only": true,
+        "basis": "ASR A1.2 §5(3) 작업실 최소 8 m² — 인원을 몰라 줄이지 않고 하한만"
+      }
+    ],
+    "exterior": [
+      {
+        "match": "^(Buero|Labor|Besprechung|Seminar)",
+        "basis": "작업실은 채광·외부 조망 창 (ArbStättV 부속서 3.4(1)) · 계단이 하나면 2층 이상 거실의 두 번째 피난로는 구조대 진입 창 (MBO §33(2)) — 지하(f0)는 채광 창 요건을 적용하지 않는다",
+        "floors": [
+          1,
+          2,
+          3,
+          4
+        ]
       }
     ]
   },
@@ -44,31 +64,38 @@
       {
         "id": "CIRC-ACCESS",
         "params": {
-          "door_m": 0.8,
+          "door_m": 0.9,
           "via_rooms": 1,
-          "touch_tol_m": 1.0
+          "touch_tol_m": 1.0,
+          "no_through": "^(WC|Technik|Labor|Seminar|Dachboden)",
+          "direct": "^(Labor|WC|Technik|Seminar)",
+          "no_entry_types": [
+            "stair"
+          ],
+          "entry_ok": "^(Buero|Besprechung|Seminar|WC|Dachboden)"
         },
-        "_why": "ASR A2.3 표 1 피난 문 최소 0.80 m"
+        "_why": "문 0.90 m (ASR A2.3 표 1, 6명 이상) · 화장실·기계실·실험실·세미나실·다락은 다른 실의 통로가 되지 않는다 (ASR A2.3 3.6 — 세미나실·다락 포함은 가정) · 실험실·화장실·기계실·세미나실은 복도에 직접 (TRGS 526 6.2.2, ASR A4.1 5.2(2) 전실 규정, MFeuV §6, EltBauVO §4) · 기계실·실험실은 계단실로 문을 내지 않는다 (MFeuV §6(1), EltBauVO §4(1); 실험실은 가정) — 사무실·회의실·화장실·다락은 MBO §35(6) 로 허용"
       },
       {
         "id": "CIRC-CONNECT",
         "params": {
-          "min_width_m": 1.0,
+          "min_width_m": 1.2,
           "touch_tol_m": 1.0,
           "must_include": [
             "stair"
           ]
         },
-        "_why": "ASR A1.8 표 2 통로 1.00 m (≤20명)"
+        "_why": "필요 복도 폭 1.20 m — 피난 인원 21–200명 (ASR A2.3 표 1 C열, ASR A1.8 표 2)"
       },
       {
         "id": "EGRESS",
         "params": {
           "max_travel_m": 35.0,
           "min_exits": 1,
-          "exempt": "Dachboden|Technik"
+          "exempt": "Dachboden",
+          "ground_floor": 1
         },
-        "_why": "MBO §35(2) / ASR A2.3 §5(2): 계단까지 35 m. 이 건물은 계단이 1개 — 두 번째 피난로는 소방 구조장비(MBO §33(2), 이번 조사에서 미확인)로 보고 min_exits 1"
+        "_why": "계단까지 35 m (MBO §35(2), ASR A2.3) · 피난층은 1층(EG) — 지하 계단도 EG 까지 이어져야 한다 · 지하 기계실도 35 m 적용 (MBO §35(2) 는 지하층 모든 지점 — 예전엔 면제였다)"
       }
     ],
     "weights": {
@@ -85,5 +112,32 @@
     "search": {
       "warm_temperature": 0.05
     }
+  },
+  "_research": {
+    "file": "research/institute_real.json",
+    "applied": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R8",
+      "R9",
+      "R13",
+      "R14",
+      "R18",
+      "R19"
+    ],
+    "not_modeled": [
+      "R7",
+      "R10",
+      "R11",
+      "R12",
+      "R15",
+      "R16",
+      "R17",
+      "R20"
+    ]
   }
 }

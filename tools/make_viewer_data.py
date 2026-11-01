@@ -30,6 +30,7 @@ import tools as T            # noqa: E402
 
 OUT = os.path.join(ROOT, "docs", "data.js")
 SEED = 20260826
+N_CAND = 4          # 후보안 — 사람이 고른다 (engine/candidates.py)
 FN = os.path.join(ROOT, "examples", "function")
 PUB = os.path.join(ROOT, "..", "bench", "real", "public")
 
@@ -100,6 +101,9 @@ def access_paths(blocks, params, cl, fh=None):
     import re as _re
     thr = _re.compile(params["through_ok"], _re.I) if params.get("through_ok") else None
     cfor = [(_re.compile(a, _re.I), _re.compile(b, _re.I)) for a, b in (params.get("corridor_for") or [])]
+    nothr = _re.compile(params["no_through"], _re.I) if params.get("no_through") else None
+    noent = set(params.get("no_entry_types") or [])
+    ent_ok = _re.compile(params["entry_ok"], _re.I) if params.get("entry_ok") else None
     out = {}
     blocks = list(blocks)
     if fh:                                               # 여러 층을 관통하는 동선(계단 코어)은 위층에도 있다
@@ -132,10 +136,13 @@ def access_paths(blocks, params, cl, fh=None):
             return None
         depth, frontier = {}, []
         def okc(r):
+            base = circ
+            if noent and not (ent_ok and ent_ok.search((r.get("name") or "") + " " + r["id"])):
+                base = [c for c in circ if c.get("circ") not in noent]
             for rx, crx in cfor:
-                if rx.search(r.get("name") or ""):
-                    return [c for c in circ if crx.search(c.get("name") or "")]
-            return circ
+                if rx.search((r.get("name") or "") + " " + r["id"]):
+                    return [c for c in base if crx.search((c.get("name") or "") + " " + c["id"])]
+            return base
         for r in rooms:                                  # 복도에 바로 닿는 실
             best = None
             for c in okc(r):
@@ -152,7 +159,7 @@ def access_paths(blocks, params, cl, fh=None):
                 if r["id"] in depth:
                     continue
                 for q in frontier:
-                    if thr and not thr.search(q.get("name") or ""):
+                    if (thr and not thr.search((q.get("name") or "") + " " + q["id"])) or (nothr and nothr.search((q.get("name") or "") + " " + q["id"])):
                         continue                         # 통로로 쓰면 안 되는 실은 거치지 않는다
                     d = touch(r, q)
                     if d:
@@ -181,7 +188,8 @@ def run_case(c):
             t.ga_apply_example_requirements(project_id=pid, name=ex)
         else:
             r = t.ga_import_drawing(path=c["src"], options=req.get("import_options"))
-            pid = t.ga_create_project(takeoff_ids=[r["takeoff_id"]], project_name=c["key"])["project_id"]
+            pid = t.ga_create_project(takeoff_ids=[r["takeoff_id"]], project_name=c["key"],
+                                      options=req.get("import_options"))["project_id"]
         patch = {k: v for k, v in req.items() if not k.startswith("_") and k != "import_options"}
         t.ga_update_ir(project_id=pid, patch=patch, reason=f"기능 유지 요건 {c['req']}")
         if not t.ga_validate(project_id=pid)["passed"]:
@@ -190,7 +198,7 @@ def run_case(c):
         d, ir = t._load_ir(pid)
         asis = t.ws.rjson(os.path.join(d, "asis.json"))
         out = os.path.join(tmp, "out")
-        s = pipeline.optimize_ir(ir, out, effort="thorough", seed=SEED, asis=asis)
+        s = pipeline.optimize_ir(ir, out, effort="thorough", seed=SEED, asis=asis, n_candidates=N_CAND)
 
         spec = G.spec_from_dict(ir)
         notes = {b["id"]: b["_program"] for b in ir["blocks"] if b.get("_program")}
@@ -217,15 +225,48 @@ def run_case(c):
             removed=res.get("removed", []), program=ir.get("_program_report", []),
             requirements=reqs, req_note=req.get("_note", ""), req_sources=req.get("_sources", {}),
             result_sha256=s["result_sha256"], seed=SEED)
+        with open(os.path.join(out, "candidates.json"), encoding="utf-8") as fp:
+            cands = json.load(fp)
+        am = s["asis"]
+        rec["candidates"] = []
+        for k in cands:
+            r2 = k["result"]
+            g2 = {idx[b["id"]]: dict(x=b["x"], y=b["y"], w=b["w"], d=b["d"], f=b["f"], z=b["z"]) for b in r2["blocks"]}
+            v2 = [type("V", (), dict(cid=v["id"], detail=v["detail"], amount=v["amount"], hard=True,
+                                     blocks=v["blocks"])) for v in r2["hard_violations"]]
+            m = k["metrics"]
+            lay = dict(blocks=_blocks(spec, g2, fh, notes), **_metrics(m, v2), removed=r2.get("removed", []))
+            if acc:
+                lay["access"] = access_paths(lay["blocks"], acc, clmap, fh)
+            rec["candidates"].append(dict(
+                key=k["key"], label=k["label"], why=k["why"], profile=k["profile"], moved_m=k.get("moved_m"),
+                pct=round((1 - m["footprint_m2"] / am["footprint_m2"]) * 100, 2),
+                asis_better=(am["hard_violation_count"] > 0, am["objective"]) < (m["hard_violation_count"] > 0, m["objective"]),
+                result_sha256=k["result_sha256"], layout=lay))
         if acc:
             rec["asis"]["access"] = access_paths(rec["asis"]["blocks"], acc, clmap, fh)
             rec["optimized"]["access"] = access_paths(rec["optimized"]["blocks"], acc, clmap, fh)
+        rs = req.get("_research")
+        if rs:
+            with open(os.path.join(FN, rs["file"]), encoding="utf-8") as fp:
+                R = json.load(fp)
+            ap = set(rs.get("applied", []))
+            rec["research"] = dict(
+                summary=R.get("summary_ko", ""), note=rs.get("note", ""),
+                open_questions=R.get("open_questions", [])[:8],
+                items=[dict(id=x["id"], what=x.get("what_ko", ""), why=x.get("why_ko", ""), rule=x.get("rule", ""),
+                            status=(x.get("status") or "").split()[0].split("(")[0], priority=x.get("priority", ""),
+                            applied=x["id"] in ap,
+                            source={k: (x.get("source") or {}).get(k) for k in ("title", "section", "url")})
+                       for x in R.get("requirements", [])])
         for k in ("real", "source", "source_url", "license", "changes"):
             if k in c:
                 rec[k] = c[k]
         if c.get("real") and not c.get("publish_geometry", False):
             rec["asis"]["blocks"] = []
             rec["optimized"]["blocks"] = []
+            for k in rec["candidates"]:
+                k["layout"]["blocks"] = []
             rec["geometry_withheld"] = True
         return rec
     finally:

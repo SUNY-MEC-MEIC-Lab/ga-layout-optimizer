@@ -1070,6 +1070,12 @@ def _touch_len(a, b, tol: float) -> Tuple[float, float]:
     """두 사각형 (x,y,w,d) 이 벽을 사이에 두고 맞닿은 길이와 간극. 맞닿지 않으면 (0, 간극)."""
     gx = max(b[0] - (a[0] + a[2]), a[0] - (b[0] + b[2]))
     gy = max(b[1] - (a[1] + a[3]), a[1] - (b[1] + b[3]))
+    # 정확히 맞닿은 변(13.2 = 1.8 + 11.4)은 부동소수 오차로 -1e-15 겹침이 될 수 있다 — 0 으로 본다.
+    # (그러지 않으면 '겹침 길이 1e-15' 로 나와 맞닿은 계단과 복도가 끊긴 것으로 채점됐다.)
+    if abs(gx) < 1e-6:
+        gx = 0.0
+    if abs(gy) < 1e-6:
+        gy = 0.0
     if gx <= tol and gy < 0:
         return -gy, max(gx, 0.0)
     if gy <= tol and gx < 0:
@@ -1122,6 +1128,11 @@ def _components(nodes, rect, edge_ok):
     return sorted(comp.values(), key=lambda c: (-len(c), min(c)))
 
 
+def _nm(b) -> str:
+    """규칙 정규식이 보는 문자열 = 이름 + id (이름이 같은 복도 구간도 id 로 가를 수 있게)."""
+    return f"{b.name or ''} {b.id}"
+
+
 def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
     cid = "CIRC-ACCESS"
     door = float(_need(p, "door_m", cid))
@@ -1136,6 +1147,11 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
     thr = _get(p, "through_ok", cid)
     thr = re.compile(thr, re.I) if thr else None
     cfor = [(re.compile(a, re.I), re.compile(b, re.I)) for a, b in (_get(p, "corridor_for", cid) or [])]
+    nothr = _get(p, "no_through", cid)
+    nothr = re.compile(nothr, re.I) if nothr else None
+    noent = set(_get(p, "no_entry_types", cid) or [])
+    ent_ok = _get(p, "entry_ok", cid)
+    ent_ok = re.compile(ent_ok, re.I) if ent_ok else None
     sp = ctx.spec
     out: List[Violation] = []
     for f in range(sp.n_floors):
@@ -1150,7 +1166,7 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
         if not rooms:
             continue
         if not circ:
-            lost = [i for i in rooms if not (ext_rx and ext_rx.search(sp.blocks[i].name or ""))]
+            lost = [i for i in rooms if not (ext_rx and ext_rx.search(_nm(sp.blocks[i])))]
             if lost:
                 out.append(Violation(cid, f"{f+1}층에 동선(복도·계단)이 하나도 없어 실 {len(lost)}개에 들어갈 수 없음",
                                      10.0 * len(lost), "m", True, [sp.blocks[i].id for i in lost[:20]]))
@@ -1170,10 +1186,15 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
                     adj[i].append(j); adj[j].append(i)
         # 실마다 '드나들 수 있는 복도' 를 정할 수 있다 (예: 수술실 → 청결 복도). 정하지 않으면 모든 동선.
         def allowed_circ(i):
+            nm = _nm(sp.blocks[i])
+            base = circ
+            if noent and not (ent_ok and ent_ok.search(nm)):
+                # 피난계단·승강기로는 실 문을 내지 않는다 (IBC 2021 §1023.4 등) — 그 동선은 출입구가 아니다
+                base = [c for c in circ if sp.blocks[c].circulation not in noent]
             for rx, crx in cfor:
-                if rx.search(sp.blocks[i].name or ""):
-                    return {c for c in circ if crx.search(sp.blocks[c].name or "")}
-            return set(circ)
+                if rx.search(nm):
+                    return {c for c in base if crx.search(_nm(sp.blocks[c]))}
+            return set(base)
         circ_set = set(circ)
         depth = {}
         # 1단계: 허용된 복도에 직접 맞닿은 실
@@ -1185,21 +1206,22 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
         while q:
             nq = []
             for i in q:
-                if depth[i] >= via + 1 or (thr and not thr.search(sp.blocks[i].name or "")):
+                nm_i = _nm(sp.blocks[i])
+                if depth[i] >= via + 1 or (thr and not thr.search(nm_i)) or (nothr and nothr.search(nm_i)):
                     continue
                 for j in adj[i]:
                     if j in depth or j in circ_set or j not in rooms:
                         continue
-                    if cfor and allowed_circ(j) != circ_set and not any(
+                    if (cfor or noent) and allowed_circ(j) != circ_set and not any(
                             depth.get(k) == 1 and set(adj[k]) & allowed_circ(j) for k in [i]):
                         continue                    # 지정 복도가 있는 실은 그 복도 쪽 실을 거쳐야 한다
                     depth[j] = depth[i] + 1
                     nq.append(j)
             q = nq
         for i in rooms:
-            if i in depth and not (direct and direct.search(sp.blocks[i].name or "") and depth[i] > 1):
+            if i in depth and not (direct and direct.search(_nm(sp.blocks[i])) and depth[i] > 1):
                 continue
-            if ext_rx and ext_rx.search(sp.blocks[i].name or ""):
+            if ext_rx and ext_rx.search(_nm(sp.blocks[i])):
                 r = rect[i]   # 바깥에서 바로 드나드는 실 (야드·쓰레기·반입) — 층 외곽에 닿으면 된다
                 if min(r[0] - fx0, r[1] - fy0, fx1 - (r[0] + r[2]), fy1 - (r[1] + r[3])) <= tol:
                     continue
@@ -1230,6 +1252,9 @@ register(ConstraintDef(
         direct=P("regex", None, False, "복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨)."),
         through_ok=P("regex", None, False, "다른 실이 '거쳐 지나가도' 되는 실 이름. 정하면 그 외의 실(멸균 코어 등)은 통로로 못 쓴다."),
         corridor_for=P("pairs", None, False, "[[실 이름 정규식, 복도 이름 정규식], …] — 그 실은 그 복도로만 드나든다 (청결/오염 동선 분리)."),
+        no_through=P("regex", None, False, "다른 실이 '거쳐 지나가면 안 되는' 실 이름 (예: 화장실·창고·기계실·전기실 — IBC 2021 §1016.2)."),
+        no_entry_types=P("types", [], False, "실 문을 낼 수 없는 동선 종류 (예: ['stair','elevator'] — 피난계단실 개구부 제한, IBC 2021 §1023.4). 동선 연결·피난에는 그대로 쓴다."),
+        entry_ok=P("regex", None, False, "no_entry_types 로도 문을 낼 수 있는 실 이름 (예: 평상시 재실하는 사무실)."),
     ),
     evaluate=_eval_circ_access, hard=True, default_weight=2000.0,
 ))
@@ -1308,9 +1333,10 @@ def _eval_egress(ctx: EvalContext, p: dict) -> List[Violation]:
             continue
         g0 = int(_get(p, "ground_floor", cid))
         for i, r in items:
-            if sp.blocks[i].circulation in stypes and f > g0:
+            if sp.blocks[i].circulation in stypes and f != g0:
                 fs = ctx.spans(i)
-                if not all(k in fs for k in range(g0, f + 1)):
+                # 위층 계단은 내려가서, 지하 계단은 올라가서 피난층에 닿아야 한다 (지하 → 1층 연결도 본다)
+                if not all(k in fs for k in range(min(g0, f), max(g0, f) + 1)):
                     out.append(Violation(cid, f"{sp.blocks[i].id}: {f+1}층 계단이 피난층({g0+1}층)까지 이어지지 않음 "
                                               f"(이 계단의 층: {', '.join(str(k + 1) for k in fs)})",
                                          5.0, "m", True, [sp.blocks[i].id], marker=dict(kind="rect", floor=f, a=r)))
@@ -1346,9 +1372,132 @@ register(ConstraintDef(
         exit_separation_frac=P("ratio", None, False, "계단 간 최소 거리 / 층 대각선 (IBC 1007.1.1: 1/3 스프링클러, 1/2 비스프링클러)."),
         applies_to=P("kinds", ["room", "equipment"], False, ""),
         exempt=P("regex", None, False, "상주 인원이 없는 실(옥탑 기계실 등) — 피난 거리·출구 수 검사에서 뺀다."),
-        ground_floor=P("index", 0, False, "피난층(0 부터). 위층 계단은 이 층까지 끊김 없이 이어져야 한다."),
+        ground_floor=P("index", 0, False, "피난층(0 부터). 위층·지하층 계단은 이 층까지 끊김 없이 이어져야 한다."),
     ),
     evaluate=_eval_egress, hard=True, default_weight=2000.0,
+))
+
+
+def _eval_adjacent(ctx: EvalContext, p: dict) -> List[Violation]:
+    cid = "ADJACENT"
+    tol = float(_get(p, "touch_tol_m", cid))
+    sp = ctx.spec
+    out: List[Violation] = []
+    for rule in _need(p, "rules", cid):
+        def _sel(x):
+            if x.startswith("circ:"):           # 동선 종류로 지정 (circ:corridor|lobby)
+                ts = set(x[5:].split("|"))
+                return lambda blk: blk.circulation in ts
+            rx = re.compile(x, re.I)
+            return lambda blk: bool(rx.search(_nm(blk)))
+        ra, rb = _sel(rule["a"]), _sel(rule["b"])
+        mode = rule.get("mode", "must")
+        need = float(rule.get("min_touch_m", 0.9))
+        why = rule.get("why", "")
+        for f in range(sp.n_floors):
+            items = _on_floor(ctx, f)
+            A = [(i, r) for i, r in items if ra(sp.blocks[i]) and ctx.geo.get(i, {}).get("f") == f]
+            Bs = [(j, r) for j, r in items if rb(sp.blocks[j])]
+            for i, r in A:
+                cands = [(j, _touch_len(r, rj, _tol_of(ctx, i, j, tol))) for j, rj in Bs if j != i]
+                if mode == "must":
+                    if not cands:
+                        continue          # 이 층에 상대가 없다 — 다른 층 배치는 층 배정 문제로 본다
+                    mg = rule.get("max_gap_m")
+                    if any((L >= need) if mg is None else (_g <= mg + 1e-9) for _, (L, _g) in cands):
+                        continue
+                    g = min(g for _, (_L, g) in cands)
+                    out.append(Violation(cid, f"{sp.blocks[i].id}({sp.blocks[i].name}): '{rule['b']}' 와 "
+                                              f"{need:g} m 이상 맞닿아야 함 (가장 가까운 것 {g:.1f} m) — {why}",
+                                         g + 1.0, "m", True, [sp.blocks[i].id],
+                                         marker=dict(kind="rect", floor=f, a=r)))
+                else:
+                    for j, (L, g) in cands:
+                        if L > 0.0:
+                            out.append(Violation(cid, f"{sp.blocks[i].id}↔{sp.blocks[j].id}: 맞닿으면 안 됨 "
+                                                      f"(맞닿은 길이 {L:.1f} m) — {why}",
+                                                 L + 1.0, "m", True, [sp.blocks[i].id, sp.blocks[j].id],
+                                                 marker=dict(kind="rect", floor=f, a=r)))
+    return out
+
+
+register(ConstraintDef(
+    id="ADJACENT",
+    name="인접 — 붙어 있어야 하는 실 / 붙으면 안 되는 실",
+    basis="기능상 직접 이어져야 하는 실(수술실↔멸균 코어, 검체 화장실↔검사실, 엘리베이터↔복도)과 "
+          "직접 이어지면 안 되는 실(오염실↔청결 구역). 규칙마다 근거를 why 에 적는다.",
+    formula="mode=must: ∀ a: ∃ b 같은 층, 맞닿은 길이 ≥ min_touch ; mode=must_not: ∀ a,b: 맞닿은 길이 = 0",
+    params=dict(
+        rules=P("list", None, True, "[{a: 실 정규식, b: 실 정규식, mode: must|must_not, min_touch_m, max_gap_m, why}] — max_gap_m 을 주면 맞닿음 대신 간극 ≤ max_gap 이면 된다. — 정규식은 이름+id 에 맞춘다. 'circ:corridor|lobby' 처럼 동선 종류로도 지정."),
+        touch_tol_m=P("m", 0.35, False, "벽 두께."),
+    ),
+    evaluate=_eval_adjacent, hard=True, default_weight=2000.0,
+))
+
+
+def _eval_dead_end(ctx: EvalContext, p: dict) -> List[Violation]:
+    """
+    막다른 복도: 동선망에서 한쪽 끝만 이어진 복도 사슬의 길이.
+    복도 블록의 동선 이웃(맞닿은 길이 ≥ min_width)이 1개인 블록에서 출발해, 이웃이 2개인 복도를 따라가며
+    길이(긴 변)를 더한다. 갈림(이웃 ≥3)·로비에 닿으면 그 길이가 막다른 구간이고, 출구(계단 등)에 닿으면
+    막다른 곳이 아니다. 블록 단위 근사 — 복도 조각 안의 실제 끝 위치는 보지 않는다.
+    """
+    cid = "DEAD-END"
+    lmax = float(_need(p, "max_m", cid))
+    wmin = float(_need(p, "min_width_m", cid))
+    tol = float(_get(p, "touch_tol_m", cid))
+    exits = set(_get(p, "exit_types", cid))
+    sp = ctx.spec
+    out: List[Violation] = []
+    for f in range(sp.n_floors):
+        items = _on_floor(ctx, f)
+        rect = {i: r for i, r in items}
+        circ = [i for i, _ in items if sp.blocks[i].circulation in ("corridor", "lobby") or
+                sp.blocks[i].circulation in exits]
+        nb = {i: [] for i in circ}
+        for k, i in enumerate(circ):
+            for j in circ[k + 1:]:
+                if _touch_len(rect[i], rect[j], _tol_of(ctx, i, j, tol))[0] >= wmin:
+                    nb[i].append(j); nb[j].append(i)
+        seen = set()
+        for s0 in circ:
+            if sp.blocks[s0].circulation != "corridor" or len(nb[s0]) != 1 or s0 in seen:
+                continue
+            chain, prev, cur, L, ok = [s0], None, s0, 0.0, False
+            while True:
+                seen.add(cur)
+                L += max(rect[cur][2], rect[cur][3])
+                nxt = [j for j in nb[cur] if j != prev]
+                if not nxt:
+                    break
+                j = nxt[0]
+                if sp.blocks[j].circulation in exits:
+                    ok = True; break
+                if sp.blocks[j].circulation != "corridor" or len(nb[j]) != 2:
+                    break                       # 갈림·로비 — 여기까지가 막다른 구간
+                prev, cur = cur, j
+                chain.append(j)
+            if not ok and L > lmax + 1e-9:
+                out.append(Violation(cid, f"{f+1}층 막다른 복도 {L:.1f} m > 허용 {lmax:g} m "
+                                          f"({', '.join(sp.blocks[i].id for i in chain[:4])})",
+                                     L - lmax, "m", True, [sp.blocks[i].id for i in chain[:20]],
+                                     marker=dict(kind="rect", floor=f, a=rect[s0])))
+    return out
+
+
+register(ConstraintDef(
+    id="DEAD-END",
+    name="막다른 복도 길이",
+    basis="IBC 2021 §1020.5 — 막다른 복도 20 ft(6.1 m), B·E·F·I-1·M·R-1·R-2·S·U 용도 스프링클러 시 50 ft(15.24 m). "
+          "복도 구간을 없애면 막다른 복도가 길어질 수 있다.",
+    formula="한쪽 끝만 동선망에 이어진 복도 사슬의 길이(블록 긴 변의 합) ≤ max_m — 출구에 닿는 사슬은 제외",
+    params=dict(
+        max_m=P("m", None, True, "인용 필수."),
+        min_width_m=P("m", None, True, "이어진 것으로 보는 맞닿은 길이 = 복도 최소 폭."),
+        touch_tol_m=P("m", 0.35, False, "벽 두께."),
+        exit_types=P("types", ["stair"], False, "닿으면 막다른 곳이 아닌 동선 종류."),
+    ),
+    evaluate=_eval_dead_end, hard=True, default_weight=2000.0,
 ))
 
 

@@ -1,0 +1,631 @@
+{
+  "case": "chem_plant",
+  "summary_ko": "석유화학 공정 플랜트는 면적을 줄이더라도 (1) 불이 났을 때 소방차와 정비 크레인이 모든 설비에 다가갈 수 있어야 하고, (2) 불꽃이 있는 가열로·저장탱크·제어실·변전실처럼 서로 떨어져야 하는 설비가 정해진 거리 이상 떨어져 있어야 하며, (3) 공정 설비는 배관대 양옆에 붙어 있어야 한다. 지금 요건에는 도로가 아예 없어서, 설비를 빽빽이 붙인 배치가 '통과'하지만 실제로는 소방차가 들어갈 수 없다. 공개 법령·지침에서 확인한 핵심 수치는 소방차 도로 폭 20 ft(6.1 m)와 '도로에서 150 ft(45.7 m) 이내'(IFC 2021 §503), 대형 탱크끼리 10 m·탱크와 공정·점화원 15 m(영국 HSE HSG176 Table 4), 가열로와 다른 탄화수소 설비 15 m(Red-Bag 설계지침)이다. 제어실 거리(API RP 752)는 고정 수치가 없고 위험성 평가로 정하는 방식이라 가정값으로 남겼다. 보험사 이격표(GAP.2.5.2)는 공개본을 구하지 못했다.",
+  "requirements": [
+    {
+      "id": "R1",
+      "what_ko": "소방차가 다닐 수 있는 도로(폭 6.1 m 이상)를 배치 블록으로 넣고, 모든 설비가 그 도로에서 45.7 m(150 ft) 안에 있게 한다.",
+      "why_ko": "도로 없이 설비를 붙여 놓으면 면적은 줄지만, 불이 나면 소방차·방수포가 화점에 닿지 못한다. 지금 요건은 도로를 아예 검사하지 않는다.",
+      "rule": "RACK-SERVE",
+      "params": {
+        "served": [
+          "zone:PROCESS",
+          "zone:COMP",
+          "zone:FIRED",
+          "zone:STORAGE",
+          "zone:FLARE",
+          "zone:UTIL",
+          "zone:ELEC",
+          "zone:OCCUPIED",
+          "LD-1"
+        ],
+        "max_gap_m": 45.72,
+        "rack_type": "road",
+        "connected": true,
+        "_program_patch": "program.segment 에 {match:'^RD-', type:'road', length_m:12, width_m:6.096} 도로 구간 블록을 추가해야 한다 (현재 블록 목록에 도로 없음)"
+      },
+      "targets": "모든 equipment 블록 (C-, CR-, CT-, E-, F-, FL-, K-, LD-, P-, R-, SS-, T-, UT-, V-)",
+      "source": {
+        "title": "International Fire Code 2021 (Seattle 2021 Fire Code Chapter 5 채택본 등 지자체 공개본)",
+        "section": "§503.1.1 (150 ft), §503.2.1 (20 ft 폭, 13 ft 6 in 높이)",
+        "url": "https://seattle.gov/documents/Departments/SDCI/Codes/SeattleFireCode/2021SFCChapter5.pdf",
+        "quote": "Fire apparatus access roads shall have an unobstructed width of not less than 20 feet (6096 mm), exclusive of shoulders ... shall extend to within 150 feet of all portions of the facility"
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "새로 추가 — 현재는 '배관대 옆 통로를 접근로로 가정'하고 도로를 검사하지 않음"
+    },
+    {
+      "id": "R2",
+      "what_ko": "도로 구간은 하나로 이어진 망이어야 하고, 부지 바깥(외곽)과 두 군데 이상에서 연결되어 한쪽이 막혀도 다른 쪽으로 들어올 수 있어야 한다.",
+      "why_ko": "진입로가 하나뿐이면 그 길이 화재·누출로 막히는 순간 소방대가 들어오지도, 사람이 나가지도 못한다.",
+      "rule": "NEW:ROAD-ENTRY",
+      "params": {
+        "road_type": "road",
+        "min_entries": 2,
+        "min_entry_separation_m": null
+      },
+      "targets": "^RD- 도로 구간 + 부지 외곽",
+      "source": {
+        "title": "Plot plan development 지침(OISD-STD-118 계열 문안, Scribd 업로드본 검색 요약); IFC 2021 §503.1.2 추가 진입로는 관할 판단",
+        "section": "Roads / approaches",
+        "url": "https://www.scribd.com/document/659767290/Plot-Plan-Development",
+        "quote": "Two road approaches from the highway / major road should be provided ... Both these approaches should be available for receipt of assistance in emergency."
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R3",
+      "what_ko": "막다른 도로가 45.7 m(150 ft)보다 길면 끝에 소방차 회차 공간을 둔다. 엔진에서는 '막다른 도로 구간 길이 ≤ 45.7 m' 로 단순화.",
+      "why_ko": "긴 막다른 길에 들어간 소방차는 후진으로만 빠져나와야 해서 대응이 늦어지고, 화재가 커지면 갇힌다.",
+      "rule": "NEW:ROAD-DEADEND",
+      "params": {
+        "road_type": "road",
+        "max_dead_end_m": 45.72
+      },
+      "targets": "^RD-",
+      "source": {
+        "title": "International Fire Code 2021 (지자체 공개본)",
+        "section": "§503.2.5 Dead ends",
+        "url": "https://pasadenatx.gov/DocumentCenter/View/1440/International-Fire-Code---Fire-Department-Access-PDF",
+        "quote": "Dead-end fire apparatus access roads in excess of 150 feet (45 720 mm) in length shall be provided with an approved area for turning around fire apparatus."
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R4",
+      "what_ko": "정비 때 크레인으로 들어 올려야 하는 키 큰·무거운 설비(증류탑·반응기·가열로 튜브 인출·열교환기 번들 인출)는 도로에 바로 붙어(간극 3 m 이내) 있어야 한다.",
+      "why_ko": "도로에서 멀리 있으면 이동식 크레인이 접근하지 못해 정비·교체 때 다른 설비를 철거하거나 더 큰 크레인을 불러야 한다.",
+      "rule": "RACK-SERVE",
+      "params": {
+        "served": [
+          "C-101",
+          "C-102",
+          "R-101",
+          "R-102",
+          "F-101",
+          "E-101",
+          "E-102",
+          "K-101",
+          "K-102"
+        ],
+        "max_gap_m": 3.0,
+        "rack_type": "road",
+        "connected": true
+      },
+      "targets": "C-101, C-102, R-101, R-102, F-101, E-101, E-102, K-101, K-102",
+      "source": {
+        "title": "Red-Bag BN-DG-C01G Plant Layout — Fired Heaters; Plot plan 실무 자료(whatispiping 등)",
+        "section": "Sec.2 Location",
+        "url": "https://red-bag.com/design-guides/213-bn-dg-c01g-plant-layout-fired-heaters.html",
+        "quote": "Space must be allowed for tube replacement for both horizontal and vertical heaters ... ample access for mobile equipment"
+      },
+      "status": "assumed",
+      "priority": "high",
+      "changes_today": "새로 추가 — 원칙은 2차 자료로 확인, 3 m 값은 가정(크레인 아웃리거·붐 반경에 따라 바꿀 것)"
+    },
+    {
+      "id": "R5",
+      "what_ko": "정비 적치장(LD-1)은 도로에 붙어 있어야 한다(트럭·크레인이 바로 내려놓고 싣는 곳).",
+      "why_ko": "적치장이 도로에서 떨어져 있으면 자재를 옮길 수 없어 그 면적이 쓸모없는 공간이 된다.",
+      "rule": "RACK-SERVE",
+      "params": {
+        "served": [
+          "LD-1"
+        ],
+        "max_gap_m": 0.5,
+        "rack_type": "road",
+        "connected": true
+      },
+      "targets": "LD-1",
+      "source": {
+        "title": "Plot plan 실무 자료 (whatispiping, Plant Layout Design Rules)",
+        "section": "roads",
+        "url": "https://whatispiping.com/development-of-plant-layout/",
+        "quote": "effective movement of trucks, cranes & emergency vehicles"
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "새로 추가 (현재는 need_exterior 로 부지 외곽 접면만 요구)"
+    },
+    {
+      "id": "R6",
+      "what_ko": "가열로(F-101, 불꽃 설비)는 탄화수소가 든 다른 공정 설비(증류탑·열교환기·공랭기·분리드럼·펌프·압축기)와 외곽 간 15 m 이상 떨어진다. 반응기는 공정상 예외 허용.",
+      "why_ko": "펌프·플랜지에서 새어 나온 가연성 증기가 가열로 불꽃에 닿으면 바로 화재·폭발이 된다(누출원과 점화원 분리).",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "F-101",
+            "C-101"
+          ],
+          [
+            "F-101",
+            "C-102"
+          ],
+          [
+            "F-101",
+            "E-101"
+          ],
+          [
+            "F-101",
+            "E-102"
+          ],
+          [
+            "F-101",
+            "V-101"
+          ],
+          [
+            "F-101",
+            "P-101"
+          ],
+          [
+            "F-101",
+            "P-102"
+          ],
+          [
+            "F-101",
+            "K-101"
+          ],
+          [
+            "F-101",
+            "K-102"
+          ],
+          [
+            "F-101",
+            "FL-1"
+          ]
+        ],
+        "min_dist": 15.0,
+        "hard": true
+      },
+      "targets": "F-101 ↔ C-101, C-102, E-101, E-102, V-101, P-101, P-102, K-101, K-102, FL-1",
+      "source": {
+        "title": "Red-Bag BN-DG-C01G Plant Layout — Fired Heaters",
+        "section": "Sec.2 Location",
+        "url": "https://red-bag.com/design-guides/213-bn-dg-c01g-plant-layout-fired-heaters.html",
+        "quote": "Heaters are always located at a safe distance 15 meters away from other hydrocarbon bearing equipment and preferably upwind ... on some process it is permitted for reactors to be within this distance"
+      },
+      "status": "secondary",
+      "priority": "high",
+      "changes_today": "값 확장 — 현재 F-101 은 K-101/K-102/T-10x 와 15 m(가정)만 있음. 증류탑·펌프·열교환기·드럼 쌍 추가, 근거를 가정→2차 자료로"
+    },
+    {
+      "id": "R7",
+      "what_ko": "지름 10 m 이상 대형 저장탱크끼리는 10 m 이상 떨어진다 (작은 탱크 지름, 큰 탱크 반지름, 15 m 중 작은 값, 단 10 m 이상).",
+      "why_ko": "탱크 하나에 불이 나면 옆 탱크가 복사열로 가열돼 연쇄 화재가 된다. 간격이 있어야 냉각·소화할 시간이 생긴다.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "T-101",
+            "T-102"
+          ],
+          [
+            "T-101",
+            "T-103"
+          ],
+          [
+            "T-102",
+            "T-103"
+          ]
+        ],
+        "min_dist": 10.0,
+        "hard": true
+      },
+      "targets": "T-101, T-102, T-103",
+      "source": {
+        "title": "HSE HSG176 The storage of flammable liquids in tanks (2nd ed. 2015)",
+        "section": "Table 4 Minimum separation distances for 'large' tanks (Energy Institute Model Code 기반)",
+        "url": "https://www.hse.gov.uk/pubns/priced/hsg176.pdf",
+        "quote": "Equal to the smaller of the following: the diameter of the smaller tank; half the diameter of the larger tank; 15 m, but not less than 10 m"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "새로 추가 (탱크끼리 이격은 현재 없음). 참고: OSHA 29 CFR 1910.106(b)(2)(ii)(b) 의 '지름 합의 1/6'(T-101↔T-102 = 6 m)보다 HSG176 이 엄격"
+    },
+    {
+      "id": "R8",
+      "what_ko": "대형 저장탱크는 공정 구역·고정 점화원(가열로)·비위험 구역(제어실·변전실·유틸리티)·부지 경계에서 15 m 이상 떨어진다.",
+      "why_ko": "탱크 화재·누출이 공정 설비나 사람이 있는 건물로 번지는 것을 막는다. 대량 저장품은 공정 구역 밖에 두라는 원칙.",
+      "rule": "SEP",
+      "params": {
+        "by_zone_pairs": [
+          [
+            "STORAGE",
+            "PROCESS"
+          ],
+          [
+            "STORAGE",
+            "COMP"
+          ],
+          [
+            "STORAGE",
+            "FIRED"
+          ],
+          [
+            "STORAGE",
+            "OCCUPIED"
+          ],
+          [
+            "STORAGE",
+            "ELEC"
+          ],
+          [
+            "STORAGE",
+            "UTIL"
+          ]
+        ],
+        "min_dist": 15.0,
+        "hard": true,
+        "_boundary": "부지 경계 15 m 는 NEW:BOUNDARY-SETBACK 필요 (아래 new_rule_types)"
+      },
+      "targets": "zone:STORAGE ↔ zone:PROCESS, COMP, FIRED, OCCUPIED, ELEC, UTIL",
+      "source": {
+        "title": "HSE HSG176 The storage of flammable liquids in tanks",
+        "section": "Table 4 (마지막 행); para 73",
+        "url": "https://www.hse.gov.uk/pubns/priced/hsg176.pdf",
+        "quote": "Between a tank and the site boundary, any designated non-hazardous area, process area or any fixed source of ignition 15 m"
+      },
+      "status": "verified",
+      "priority": "high",
+      "changes_today": "값 확장 — 현재 F-101↔T 15 m, T-101↔K-101·T-102↔K-102 10 m(가정)만. 10 m → 15 m 로 올리고 탱크↔공정·제어실·변전실 전 쌍으로"
+    },
+    {
+      "id": "R9",
+      "what_ko": "탱크는 소방 활동을 위해 접근 가능해야 한다 — 탱크마다 도로(R1)에 면하거나 바로 옆에 둔다(3열 이상 깊이로 묻히지 않게).",
+      "why_ko": "다른 탱크 뒤에 숨은 탱크는 불이 나도 방수할 자리가 없다.",
+      "rule": "RACK-SERVE",
+      "params": {
+        "served": [
+          "zone:STORAGE"
+        ],
+        "max_gap_m": 15.0,
+        "rack_type": "road",
+        "connected": true
+      },
+      "targets": "T-101, T-102, T-103",
+      "source": {
+        "title": "OSHA 29 CFR 1910.106 Flammable liquids",
+        "section": "1910.106(b)(2)(ii)(e)",
+        "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.106",
+        "quote": "greater spacing or other means shall be provided so that inside tanks are accessible for firefighting purposes"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "새로 추가 (원칙은 원문 확인, 15 m 값은 가정 — 탱크–부지경계 15 m 와 맞춤)"
+    },
+    {
+      "id": "R10",
+      "what_ko": "중앙 제어실(CR-1)은 공정 설비(반응기·압축기·가열로·증류탑·펌프)에서 떨어지고, 부지 외곽(정문 쪽 비위험 구역)에 면한다.",
+      "why_ko": "폭발·화재 때 제어실 사람이 다치면 비상 정지를 못 한다. 텍사스시티 정유 사고(2005)처럼 공정 가까운 사무 공간 인원이 피해를 본다.",
+      "rule": "SEP",
+      "params": {
+        "pairs_to": "CR-1",
+        "from": [
+          "zone:PROCESS",
+          "zone:COMP",
+          "zone:FIRED"
+        ],
+        "min_dist": 15.0,
+        "hard": true,
+        "_also": "CR-1 need_exterior 유지"
+      },
+      "targets": "CR-1 ↔ zone:PROCESS, COMP, FIRED",
+      "source": {
+        "title": "UK HSE COMAH Technical Measures — Plant Layout; API RP 752 (공개 요약: Quest Consultants)",
+        "section": "Occupied buildings",
+        "url": "https://www.hse.gov.uk/comah/sragtech/techmeasplantlay.htm",
+        "quote": "occupied buildings should not be sited downwind of hazardous plant areas ... should usually be housed in buildings sited in a non-hazard area near the main entrance"
+      },
+      "status": "assumed",
+      "priority": "high",
+      "changes_today": "값 유지(15 m 가정) + 대상 확장 — 현재 CR-1 은 R-101/102·K-101/102·F-101 만. C-101/102·E-·V-·P- 추가. API RP 752 는 고정 거리가 아니라 폭발압·복사열 해석(또는 회사 이격표)으로 정한다 — 원문 수치 없음"
+    },
+    {
+      "id": "R11",
+      "what_ko": "변전실(SS-1)과 유틸리티(UT-1)는 점화원이 될 수 있으므로 누출원(압축기·펌프·분리드럼·반응기)에서 떨어져 방폭 위험 구역 밖에 둔다.",
+      "why_ko": "전기 설비가 가연성 가스가 고일 수 있는 범위 안에 있으면 스파크가 점화원이 된다.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "SS-1",
+            "K-101"
+          ],
+          [
+            "SS-1",
+            "K-102"
+          ],
+          [
+            "SS-1",
+            "P-101"
+          ],
+          [
+            "SS-1",
+            "P-102"
+          ],
+          [
+            "SS-1",
+            "V-101"
+          ],
+          [
+            "SS-1",
+            "R-101"
+          ],
+          [
+            "SS-1",
+            "R-102"
+          ]
+        ],
+        "min_dist": 15.0,
+        "hard": true
+      },
+      "targets": "SS-1 (UT-1 도 동일 검토) ↔ K-101, K-102, P-101, P-102, V-101, R-101, R-102",
+      "source": {
+        "title": "UK HSE COMAH Technical Measures — Plant Layout (위험장소 구분 원칙); API RP 500 (유료, 수치 미확인)",
+        "section": "Hazardous area classification",
+        "url": "https://www.hse.gov.uk/comah/sragtech/techmeasplantlay.htm",
+        "quote": "designate areas where ignition sources should be eliminated"
+      },
+      "status": "assumed",
+      "priority": "medium",
+      "changes_today": "값 변경·확장 — 현재 SS-1↔K-101 10 m(가정)만. 15 m 는 가정(위험장소 구분 도면이 나오면 그 경계로 대체)"
+    },
+    {
+      "id": "R12",
+      "what_ko": "플레어 녹아웃 드럼(FL-1)은 제어실·사무 공간에서 떨어진다. 실제 플레어 스택은 서비스 건물·상압 저장탱크에서 300 ft(91 m) 이상 — 스택이 블록 목록에 없으므로 별도 확인.",
+      "why_ko": "플레어는 상시 불꽃·복사열원이다. 사람이 있는 건물과 저장탱크 가까이 두면 비상 방출 때 복사열·화재 위험.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "FL-1",
+            "CR-1"
+          ],
+          [
+            "FL-1",
+            "T-101"
+          ],
+          [
+            "FL-1",
+            "T-102"
+          ],
+          [
+            "FL-1",
+            "T-103"
+          ]
+        ],
+        "min_dist": 18.0,
+        "hard": true,
+        "_stack": "플레어 스택 블록을 추가하면 스택↔CR-1·T-10x 91.44 m"
+      },
+      "targets": "FL-1 ↔ CR-1, T-101, T-102, T-103",
+      "source": {
+        "title": "AXA XL PRC/GAP.2.5.2 Oil and Chemical Plant Layout and Spacing (공개본 미확보 — EPA 행정명령 CAA-08-2011-0030 인용 및 Scribd 요약으로 확인)",
+        "section": "Table 1 inter-unit spacing",
+        "url": "https://yosemite.epa.gov/oa/rhc/epaadmin.nsf/Filings/167D73496F810EDE8525791B001B8C36/$File/CAA0820110030%20AO.pdf",
+        "quote": "GAP 2.5.2 'Oil and Chemical Plant Layout and Spacing' (2007) recommends 300 feet between flares and atmospheric storage (검색 요약; 원문 PDF 는 스캔본이라 직접 판독 못함)"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "FL-1↔CR-1 18 m(가정)는 유지, FL-1↔탱크 추가. 300 ft 는 스택에만 적용 — 스택 위치는 열린 질문"
+    },
+    {
+      "id": "R13",
+      "what_ko": "공정·압축·가열 설비는 배관대 양옆에 붙어 있고, 남은 배관대는 끊기지 않는다(현행 유지). 배관대 아래·옆 통로 폭은 차량 통로 3.6 m 이상.",
+      "why_ko": "배관대에서 멀리 떨어진 설비는 배관이 길어지고 다른 통로를 가로막는다. 배관대 밑 통로가 좁으면 정비 차량이 못 지나간다.",
+      "rule": "RACK-SERVE",
+      "params": {
+        "served": [
+          "zone:PROCESS",
+          "zone:COMP",
+          "zone:FIRED"
+        ],
+        "max_gap_m": 10.0,
+        "rack_type": "piperack",
+        "connected": true
+      },
+      "targets": "^PR-1 구간 ↔ zone:PROCESS, COMP, FIRED",
+      "source": {
+        "title": "Red-Bag BN-DS-C47 Plot Arrangement and Typical Section thru Pipe Way; CCPS Guidelines for Siting and Layout of Facilities (2018, 유료 — 원칙만)",
+        "section": "2.4.1, 2.5",
+        "url": "https://www.red-bag.com/design-standards/338-bn-ds-c47-plot-arrangement-and-typical-section-thru-pipe-way.html",
+        "quote": "3600 minimum clear accessway ... pipe bottom elevation 2100 over passageways and 3600 over accessways"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "이미 있음(max_gap 10 m 는 여전히 가정). 3.6 m 통로는 R14 로 분리"
+    },
+    {
+      "id": "R14",
+      "what_ko": "공정 설비 줄 사이에는 정비 차량(픽업트럭)이 지나갈 3.6 m 통로를 남긴다 — 공정 구역 설비끼리 외곽 간 최소 3.6 m.",
+      "why_ko": "설비를 붙여 놓으면 면적은 작아지지만 사람·지게차·소형 크레인이 들어가 밸브를 돌리거나 펌프를 꺼낼 수 없다.",
+      "rule": "SEP",
+      "params": {
+        "by_zone_pairs": [
+          [
+            "PROCESS",
+            "PROCESS"
+          ],
+          [
+            "PROCESS",
+            "COMP"
+          ],
+          [
+            "COMP",
+            "COMP"
+          ]
+        ],
+        "min_dist": 3.6,
+        "hard": true,
+        "_exempt": "P-101/P-102 는 배관대 밑 배치 허용 시 제외 검토"
+      },
+      "targets": "zone:PROCESS, zone:COMP 설비 상호",
+      "source": {
+        "title": "Red-Bag BN-DS-C47 Plot Arrangement and Typical Section thru Pipe Way",
+        "section": "2.4.1 (accessway), 2.1 (passageway 900, 최소 700)",
+        "url": "https://www.red-bag.com/design-standards/338-bn-ds-c47-plot-arrangement-and-typical-section-thru-pipe-way.html",
+        "quote": "3600 minimum clear accessway"
+      },
+      "status": "secondary",
+      "priority": "medium",
+      "changes_today": "새로 추가 (현재는 블록별 clearance 1.2~3 m 만, 근거 가정)"
+    },
+    {
+      "id": "R15",
+      "what_ko": "압축기(K-101/K-102)는 누출 시 큰 증기운을 만드는 고위험 설비라 제어실·변전실·가열로와 떨어진다(R6·R10·R11 에 포함). 압축기끼리는 정비 공간을 두고 배관대 옆에 둔다.",
+      "why_ko": "압축기 누출은 증기운 폭발의 대표 원인이다.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "K-101",
+            "K-102"
+          ]
+        ],
+        "min_dist": 3.6,
+        "hard": true
+      },
+      "targets": "K-101, K-102",
+      "source": {
+        "title": "공개 수치 없음 (IRI/GAP 표는 유료). 통로 폭은 R14 근거",
+        "section": "-",
+        "url": "https://www.red-bag.com/design-standards/338-bn-ds-c47-plot-arrangement-and-typical-section-thru-pipe-way.html",
+        "quote": ""
+      },
+      "status": "assumed",
+      "priority": "low",
+      "changes_today": "새로 추가"
+    },
+    {
+      "id": "R16",
+      "what_ko": "사람이 상주하는 제어실(CR-1)은 부지 외곽에 면한 비위험 구역에 둔다(현행 need_exterior 유지). 공장 바깥 울타리 밖 배치도 검토 대상.",
+      "why_ko": "비상 시 공정 구역을 가로지르지 않고 대피·출입할 수 있어야 한다.",
+      "rule": "EXTERIOR",
+      "params": {
+        "need_exterior": true
+      },
+      "targets": "CR-1",
+      "source": {
+        "title": "UK HSE COMAH Technical Measures — Plant Layout",
+        "section": "Occupied buildings",
+        "url": "https://www.hse.gov.uk/comah/sragtech/techmeasplantlay.htm",
+        "quote": "sited in a non-hazard area near the main entrance"
+      },
+      "status": "verified",
+      "priority": "medium",
+      "changes_today": "이미 있음 — 근거만 보강"
+    },
+    {
+      "id": "R17",
+      "what_ko": "냉각탑(CT-1)은 가열로·공랭기와 떨어뜨려 흡입·배기가 섞이지 않게 한다(수증기 운무가 가열로·전기설비로 가지 않게).",
+      "why_ko": "냉각탑 습기가 변전실·가열로로 날리면 부식·전기 고장이 생기고, 공랭기 더운 공기를 다시 빨아들이면 성능이 떨어진다.",
+      "rule": "SEP",
+      "params": {
+        "pairs": [
+          [
+            "CT-1",
+            "F-101"
+          ],
+          [
+            "CT-1",
+            "SS-1"
+          ],
+          [
+            "CT-1",
+            "E-102"
+          ]
+        ],
+        "min_dist": 15.0,
+        "hard": false
+      },
+      "targets": "CT-1 ↔ F-101, SS-1, E-102",
+      "source": {
+        "title": "AXA XL PRC 2.5 spacing (Scribd 요약: 냉각탑끼리 50 ft 예시만 확인, 다른 쌍 미확인)",
+        "section": "Table 1",
+        "url": "https://www.scribd.com/document/647278665/oillplantlayoutandspacingv1-3",
+        "quote": "a 50 foot separation between two cooling towers"
+      },
+      "status": "assumed",
+      "priority": "low",
+      "changes_today": "새로 추가 (soft 제안). 풍향은 엔진이 다루지 않음"
+    }
+  ],
+  "room_sizes": [
+    {
+      "match": "^RD-",
+      "min_area_m2": 0,
+      "min_clear_dim_m": 6.096,
+      "basis": "IFC 2021 §503.2.1 소방차 진입로 순폭 20 ft (6096 mm), 상부 높이 13 ft 6 in",
+      "url": "https://seattle.gov/documents/Departments/SDCI/Codes/SeattleFireCode/2021SFCChapter5.pdf",
+      "status": "secondary"
+    },
+    {
+      "match": "^PR-1",
+      "min_area_m2": 0,
+      "min_clear_dim_m": 3.6,
+      "basis": "Red-Bag BN-DS-C47 §2.4.1 배관대 밑 차량 통로 3600 mm (배관대 폭 자체는 배관 수로 정해짐 — 현재 6 m 유지)",
+      "url": "https://www.red-bag.com/design-standards/338-bn-ds-c47-plot-arrangement-and-typical-section-thru-pipe-way.html",
+      "status": "secondary"
+    }
+  ],
+  "new_rule_types": [
+    {
+      "name": "ROAD (circulation type 'road' + RACK-SERVE 재사용)",
+      "semantics_ko": "기존 RACK-SERVE 를 rack_type='road' 로 쓴다. 도로 구간 블록(폭 6.096 m, 12 m 단위, optional)을 program.segment 로 만들고: (1) served 설비 각각과 가장 가까운 도로 구간 사이 외곽 간극 ≤ max_gap, (2) 도로 구간끼리 맞닿음(≥ 도로 폭) 그래프가 연결. 다른 설비 블록이 도로 구간과 겹치면 안 된다(일반 겹침 금지로 이미 보장).",
+      "params": {
+        "served": "설비 선택자",
+        "max_gap_m": "도로까지 최대 간극 (소방: 45.72, 크레인: 3)",
+        "rack_type": "'road'"
+      }
+    },
+    {
+      "name": "ROAD-ENTRY",
+      "semantics_ko": "도로 망이 부지 외곽선(엔벨로프 경계)과 맞닿은 지점(도로 구간의 변이 외곽에 놓임)을 진입점으로 센다. 진입점 수 ≥ min_entries 이고, 두 진입점 사이 외곽 둘레거리 ≥ min_entry_separation_m. 위반량 = 부족한 진입점 수 × 벌점(m 환산) + 이격 부족분.",
+      "params": {
+        "road_type": "도로 circulation 값",
+        "min_entries": "기본 2",
+        "min_entry_separation_m": "진입점 간 최소 거리 (관할 지정, 기본 없음)"
+      }
+    },
+    {
+      "name": "ROAD-DEADEND",
+      "semantics_ko": "도로 구간 그래프에서 차수 1 인 끝 구간부터 차수 ≥3 분기점 또는 외곽 진입점까지의 경로 길이(구간 길이 합)를 막다른 길 길이로 본다. 길이 > max_dead_end_m 이고 끝에 회차 블록(type 'turnaround')이 없으면 초과분을 위반량(m).",
+      "params": {
+        "road_type": "도로 circulation 값",
+        "max_dead_end_m": "IFC §503.2.5 = 45.72"
+      }
+    },
+    {
+      "name": "BOUNDARY-SETBACK",
+      "semantics_ko": "지정 블록의 외곽과 부지 경계선(엔벨로프 외곽 또는 지정 부지선) 사이 최소 거리. EXTERIOR 의 반대 — 탱크는 경계에서 15 m 떨어져야 한다(HSG176 Table 4). 위반량 = max(0, d_min − 경계까지 거리).",
+      "params": {
+        "targets": "블록 선택자",
+        "min_dist_m": "경계 이격",
+        "boundary": "'envelope' 또는 고정 부지선 좌표"
+      }
+    }
+  ],
+  "not_layout_related": [
+    "탱크 방유제 용량·높이 (HSG176, NFPA 30) — 배치 면적에는 방유제 블록 크기로만 반영, 용량 계산은 배치와 무관",
+    "소화전·모니터 간격(최대 45 m 등)·소화수 용량 — 설비 배치 후 배관 설계 단계",
+    "제어실 방폭 구조 등급(API RP 752 의 건물 내압 설계) — 구조 설계",
+    "위험장소 구분(Class/Zone) 등급과 방폭 기기 선정 — 배치 결과에 따라 사후 작성",
+    "배관대 높이·도로 위 배관 높이(4.8 m 등) — 2D 평면 배치와 무관 (높이 검토는 별도)",
+    "풍향(제어실을 공정의 바람 위쪽에) — 엔진이 풍향을 모름; 바람장미가 있으면 방향 제약으로 따로 만들어야 함"
+  ],
+  "open_questions": [
+    "실제 플레어 스택(또는 지상 플레어)의 위치와 방출량은? FL-1(녹아웃 드럼)만 블록에 있다. 스택이 부지 안이면 서비스 건물·탱크와 300 ft(GAP 2.5.2 인용) 이격이 필요하다.",
+    "제어실 이격은 회사 이격표·API RP 752 폭발 해석 결과 중 무엇으로 정하나? 제어실이 방폭(blast-resistant) 구조인가?",
+    "보험사(AXA XL GAP.2.5.2 / FM) 이격표를 소유자가 보유하고 있나? 있으면 R6·R10·R11·R15 가정값을 대체해야 한다.",
+    "관할 소방 당국이 IFC 를 채택하는가, 국내 기준(예: 위험물안전관리법 시행규칙 보유공지·소방차 전용 통로)을 따르나? 도로 폭·진입로 수가 달라질 수 있다.",
+    "탱크 지름과 지붕 형식(고정·부상)은? HSG176 Table 4 이격은 지붕 형식으로 달라진다(부상지붕은 10 m).",
+    "주 풍향(바람장미)은? 가열로·제어실의 바람 위쪽 배치를 넣으려면 필요하다.",
+    "정비 크레인 기종(아웃리거 폭·작업 반경)은? R4 의 도로-설비 최대 간극 3 m 는 가정이다."
+  ]
+}
