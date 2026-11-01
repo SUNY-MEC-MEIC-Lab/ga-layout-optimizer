@@ -28,9 +28,10 @@
         "params": {
           "door_m": 1.054,
           "via_rooms": 1,
-          "touch_tol_m": 0.5
+          "touch_tol_m": 0.5,
+          "direct": "수술실"
         },
-        "_why": "I-2 침대 출입 문 41.5 in (IBC 2021 §1010.1.1)"
+        "_why": "I-2 침대 출입 문 41.5 in (IBC 2021 §1010.1.1) · 수술실은 침대가 다른 실을 거치지 않도록 복도에 직접 접해야 한다(direct)"
       }
     ],
     "weights": {

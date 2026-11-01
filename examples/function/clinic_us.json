@@ -1,5 +1,5 @@
 {
-  "_note": "실제 의료·치과 클리닉(미국, 2층, 업무시설 B·스프링클러 가정) — 기능 유지 요건. 검증된 공개 기준만 hard 로 쓰고, 미검증 값은 쓰지 않는다. 규칙이 없는 실(치과 진료실·사무실·대기실 등)은 줄이지 않는다.",
+  "_note": "실제 의료·치과 클리닉(미국, 2층, 업무시설 B·스프링클러 가정) — 기능 유지 요건. 치수 기준은 검증된 공개 값만 쓰고 미검증 값은 쓰지 않는다. 단 via_rooms·벽 두께 허용치는 모델링 가정이다. 규칙이 없는 실(치과 진료실·사무실·대기실 등)은 줄이지 않는다.",
   "_sources": {
     "IBC": "IBC 2021 Ch.10 (UpCodes, 무수정 주 채택본: CT·IL·WI) — 1007.1.1, 1010.1.1, Table 1017.2, Table 1020.3",
     "ADA": "2010 ADA Standards (access-board.gov) — 304.3.1, 404.2.3",
@@ -43,12 +43,12 @@
       {
         "id": "CIRC-ACCESS",
         "params": {
-          "door_m": 0.815,
+          "door_m": 0.813,
           "via_rooms": 2,
           "touch_tol_m": 1.0,
           "exterior_access": "YARD|TRASH|RECEIV|GAS STOR|MECH"
         },
-        "_why": "문 순폭 32 in = IBC 2021 §1010.1.1 / ADA §404.2.3. via_rooms 2 = 진료 스위트 안의 실(모델링 값). touch_tol 1.0 m = 벽 두께 + 다각형 근사"
+        "_why": "문 순폭 32 in (0.813 m) = IBC 2021 §1010.1.1 / ADA §404.2.3. via_rooms 2 = 진료 스위트 안의 실(모델링 값). touch_tol 1.0 m = 벽 두께 + 다각형 근사"
       },
       {
         "id": "CIRC-CONNECT",

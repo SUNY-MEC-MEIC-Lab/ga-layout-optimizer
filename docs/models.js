@@ -137,8 +137,8 @@ export const TYPES = {
 // 재질 · 기본 도형
 // ---------------------------------------------------------------------------
 const C = {
-  steel: 0x9aa3ad, dark: 0x3b4048, concrete: 0xb9b6ad, white: 0xf2f2ef, floor: 0xe6e3dc,
-  water: 0x3d8fd6, screen: 0x1d2a44, glow: 0x6fd3ff, yellow: 0xf2c230, orange: 0xf08a24,
+  steel: 0x9aa2ab, dark: 0x3d4149, concrete: 0xbab7ae, white: 0xf3f2ee, floor: 0xe9e6df,
+  water: 0x4a8fcc, screen: 0x1f2a42, glow: 0x7fd0f5, yellow: 0xe3b53c, orange: 0xd9822e,
   pipe: 0xc98b3a, green: 0x5aa469, flame: 0xff7a1a,
 };
 function mat(color, o = {}) {

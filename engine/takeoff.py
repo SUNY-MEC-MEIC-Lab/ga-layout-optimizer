@@ -184,6 +184,8 @@ def _rect_partition(poly: List[List[float]], eps: float = 1e-6) -> Optional[List
     for ya, yb in zip(ys, ys[1:]):
         ym = (ya + yb) / 2
         xs = sorted(x for x, lo, hi in vert if lo < ym < hi)
+        if len(xs) % 2:
+            return None             # 교차 수가 홀수 — 다각형이 이상하다. 쪼개지 않고 원래대로 둔다
         bands.append((ya, yb, [(xs[k], xs[k + 1]) for k in range(0, len(xs) - 1, 2)]))
     rects: List[List[float]] = []
     open_: Dict[Tuple[float, float], List[float]] = {}
@@ -268,7 +270,6 @@ def _resolve_overlaps(items: List[dict], passes: int = 8, min_dim: float = 0.6
                     ma, mb = movable(a), movable(b)
                     if not (ma or mb):
                         continue
-                    pairs.add((idx[ia], idx[ib]))
                     share = (0.5, 0.5) if (ma and mb) else ((1.0, 0.0) if ma else (0.0, 1.0))
                     if ox <= oy:      # 좌우로 떼기
                         lo, hi = (a, b) if a["x"] + a["w"] / 2 <= b["x"] + b["w"] / 2 else (b, a)
@@ -278,6 +279,7 @@ def _resolve_overlaps(items: List[dict], passes: int = 8, min_dim: float = 0.6
                             continue
                         lo["w"] -= cut_lo
                         hi["x"] += cut_hi; hi["w"] -= cut_hi
+                        pairs.add((idx[ia], idx[ib]))
                     else:             # 위아래로 떼기
                         lo, hi = (a, b) if a["y"] + a["d"] / 2 <= b["y"] + b["d"] / 2 else (b, a)
                         s_lo, s_hi = (share if lo is a else share[::-1])
@@ -286,6 +288,7 @@ def _resolve_overlaps(items: List[dict], passes: int = 8, min_dim: float = 0.6
                             continue
                         lo["d"] -= cut_lo
                         hi["y"] += cut_hi; hi["d"] -= cut_hi
+                        pairs.add((idx[ia], idx[ib]))
                     changed = True
         if not changed:
             break

@@ -44,9 +44,9 @@ IR 에는 이렇게 적는다.
 
 | ID | 이름 | 유형 | 근거 | 파라미터 |
 |---|---|---|---|---|
-| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access` |
-| `CIRC-CONNECT` | 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다 | hard | 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 §1020.2 복도 44 in = 1.118 m, ASR A1.8 표 1). | `min_width_m`*, `touch_tol_m`, `circulation_types`, `must_include` |
-| `EGRESS` | 피난 — 계단까지 거리·계단 수·계단 간 이격 | hard | IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다. | `max_travel_m`*, `exit_types`, `min_exits`, `exit_separation_frac`, `applies_to`, `exempt` |
+| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access`, `direct` |
+| `CIRC-CONNECT` | 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다 | hard | 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 Table 1020.3 복도 44 in = 1.118 m, ASR A1.8 표 2). | `min_width_m`*, `touch_tol_m`, `circulation_types`, `must_include` |
+| `EGRESS` | 피난 — 계단까지 거리·계단 수·계단 간 이격 | hard | IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다. | `max_travel_m`*, `exit_types`, `min_exits`, `exit_separation_frac`, `applies_to`, `exempt`, `ground_floor` |
 | `ELEC-SEP` | 전기계통 물리적 분리 | hard | GDC 17 + RG 1.75 Rev.3. ★ 현행 RG 1.75 Rev.3 본문에는 수치 이격거리가 전혀 없다. IEEE Std 384-1992 채택 시 원문이 1981년판 대비 "특정 형상에 대해 이격거리 기준이 축소되었다"고 명시했다. | `groups`*, `min_horizontal_m`*, `citation`*, `barrier_pairs` |
 | `FIRE-20FT` | 화재방호 계열 분리 (App. R III.G.2) | hard | 10 CFR 50 Appendix R III.G.2 — 고온정지 1계열 무손상: ①3시간 내화방벽 ②수평 20 ft(6.096 m) 초과 + 개재 가연물 0 + 감지·자동소화 ③1시간 방벽 + 감지·자동소화 중 하나. | `groups`*, `min_horizontal_m`, `gap_metric`, `combustible_free`*, `detection_and_suppression`*, `barrier_pairs` |
 | `FIRE-HATCH` | ★ 해치·계단에 의한 화재구역 병합 | hard | RG 1.189 Rev.5 — 벽·바닥에 해치·계단 같은 대형 미방호 개구부가 있으면 양쪽을 하나의 화재구역으로 간주한다. 예외는 성공경로 간 누적 수평거리 6.1 m + 개재 가연물 0 + 양쪽 층 감지·소화를 모두 만족할 때뿐. | `openings`*, `separation_m`, `combustible_free`*, `both_levels_protected`*, `merge_tolerance_m`, `required_distinct`, `penalty_m_per_conflict` |
@@ -87,6 +87,7 @@ IR 에는 이렇게 적는다.
 | `applies_to` | kinds |  | `['room']` | 출입을 확인할 블록 종류. |
 | `circulation_types` | types |  | `['corridor', 'stair', 'elevator', 'lobby']` | 동선으로 보는 circulation 값. |
 | `exterior_access` | regex |  | — | 바깥 문으로 드나드는 실 이름 (예: YARD/TRASH/RECEIV) — 층 외곽에 닿으면 출입 가능. |
+| `direct` | regex |  | — | 복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨). |
 
 ---
 
@@ -96,7 +97,7 @@ IR 에는 이렇게 적는다.
 
 **근거**
 
-> 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 §1020.2 복도 44 in = 1.118 m, ASR A1.8 표 1).
+> 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 Table 1020.3 복도 44 in = 1.118 m, ASR A1.8 표 2).
 
 **수식**
 
@@ -139,6 +140,7 @@ IR 에는 이렇게 적는다.
 | `exit_separation_frac` | ratio |  | — | 계단 간 최소 거리 / 층 대각선 (IBC 1007.1.1: 1/3 스프링클러, 1/2 비스프링클러). |
 | `applies_to` | kinds |  | `['room', 'equipment']` |  |
 | `exempt` | regex |  | — | 상주 인원이 없는 실(옥탑 기계실 등) — 피난 거리·출구 수 검사에서 뺀다. |
+| `ground_floor` | index |  | `0` | 피난층(0 부터). 위층 계단은 이 층까지 끊김 없이 이어져야 한다. |
 
 ---
 

@@ -1078,13 +1078,23 @@ def _touch_len(a, b, tol: float) -> Tuple[float, float]:
 
 
 def _on_floor(ctx: EvalContext, f: int):
-    """층 f 에 놓인 블록 (i, rect) — 다층 블록(계단 코어)의 위층 그림자 포함."""
+    """
+    층 f 에 놓인 블록 (i, 본체 rect) — 다층 블록(계단 코어)의 위층 그림자 포함.
+    접촉·간극은 '본체' 로 잰다. 유지보수 이격(clearance)을 포함한 외곽으로 재면 본체가 복도에서
+    1.5 m 떨어져 있어도 맞닿은 것으로 나온다 (독립 검증에서 발견). 이격은 _tol_of 로 허용 간극에 더한다.
+    """
     out = []
     for i in range(len(ctx.spec.blocks)):
         r = ctx.rect_on(i, f)
         if r is not None:
-            out.append((i, r))
+            cl = ctx.spec.blocks[i].clearance
+            out.append((i, (r[0] + cl, r[1] + cl, max(r[2] - 2 * cl, 0.01), max(r[3] - 2 * cl, 0.01))))
     return out
+
+
+def _tol_of(ctx: EvalContext, i: int, j: int, tol: float) -> float:
+    """두 블록의 허용 간극 = 벽 두께(tol) + 양쪽 유지보수 이격 (이격 공간은 접근 통로로 쓸 수 있다)."""
+    return tol + ctx.spec.blocks[i].clearance + ctx.spec.blocks[j].clearance
 
 
 def _components(nodes, rect, edge_ok):
@@ -1121,6 +1131,8 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
     ctypes = set(_get(p, "circulation_types", cid))
     ext_rx = _get(p, "exterior_access", cid)
     ext_rx = re.compile(ext_rx, re.I) if ext_rx else None
+    direct = _get(p, "direct", cid)
+    direct = re.compile(direct, re.I) if direct else None
     sp = ctx.spec
     out: List[Violation] = []
     for f in range(sp.n_floors):
@@ -1144,12 +1156,13 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
         nodes = circ + rooms
         srt = sorted(nodes, key=lambda i: rect[i][0])
         adj: Dict[int, List[int]] = {i: [] for i in nodes}
+        maxcl = max((sp.blocks[i].clearance for i in nodes), default=0.0)
         for k, i in enumerate(srt):
             ri = rect[i]
             for j in srt[k + 1:]:
-                if rect[j][0] > ri[0] + ri[2] + tol:
+                if rect[j][0] > ri[0] + ri[2] + tol + 2 * maxcl:
                     break
-                L, _g = _touch_len(ri, rect[j], tol)
+                L, _g = _touch_len(ri, rect[j], _tol_of(ctx, i, j, tol))
                 if L >= door:
                     adj[i].append(j); adj[j].append(i)
         depth = {i: 0 for i in circ}
@@ -1167,15 +1180,17 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
                     nq.append(j)
             q = nq
         for i in rooms:
-            if i in depth:
+            if i in depth and not (direct and direct.search(sp.blocks[i].name or "") and depth[i] > 1):
                 continue
             if ext_rx and ext_rx.search(sp.blocks[i].name or ""):
                 r = rect[i]   # 바깥에서 바로 드나드는 실 (야드·쓰레기·반입) — 층 외곽에 닿으면 된다
                 if min(r[0] - fx0, r[1] - fy0, fx1 - (r[0] + r[2]), fy1 - (r[1] + r[3])) <= tol:
                     continue
-            g = min(_touch_len(rect[i], rect[c], tol)[1] for c in circ)
+            g = min(_touch_len(rect[i], rect[c], _tol_of(ctx, i, c, tol))[1] for c in circ)
+            how = ("복도에 직접 접해야 하는 실인데 다른 실을 거쳐야 들어감" if i in depth
+                   else "복도·다른 실을 통해 들어갈 수 없음")
             out.append(Violation(
-                cid, f"{sp.blocks[i].id}({sp.blocks[i].name}): 복도·다른 실을 통해 들어갈 수 없음 "
+                cid, f"{sp.blocks[i].id}({sp.blocks[i].name}): {how} "
                      f"(가까운 동선까지 {g:.1f} m, 문 폭 {door:g} m 이상 맞닿아야 함)",
                 g + 1.0, "m", True, [sp.blocks[i].id],
                 marker=dict(kind="rect", floor=f, a=rect[i])))
@@ -1195,6 +1210,7 @@ register(ConstraintDef(
         applies_to=P("kinds", ["room"], False, "출입을 확인할 블록 종류."),
         circulation_types=P("types", list(CIRC_DEFAULT), False, "동선으로 보는 circulation 값."),
         exterior_access=P("regex", None, False, "바깥 문으로 드나드는 실 이름 (예: YARD|TRASH|RECEIV) — 층 외곽에 닿으면 출입 가능."),
+        direct=P("regex", None, False, "복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨)."),
     ),
     evaluate=_eval_circ_access, hard=True, default_weight=2000.0,
 ))
@@ -1214,10 +1230,10 @@ def _eval_circ_connect(ctx: EvalContext, p: dict) -> List[Violation]:
         circ = [i for i, _ in items if sp.blocks[i].circulation in ctypes]
         if not circ:
             continue
-        comps = _components(circ, rect, lambda i, j: _touch_len(rect[i], rect[j], tol)[0] >= wmin)
+        comps = _components(circ, rect, lambda i, j: _touch_len(rect[i], rect[j], _tol_of(ctx, i, j, tol))[0] >= wmin)
         main = comps[0]
         for c in comps[1:]:
-            g = min(_touch_len(rect[a], rect[b], tol)[1] for a in c for b in main)
+            g = min(_touch_len(rect[a], rect[b], _tol_of(ctx, a, b, tol))[1] for a in c for b in main)
             out.append(Violation(
                 cid, f"{f+1}층 동선이 끊겼다: {', '.join(sp.blocks[i].id for i in c[:4])}"
                      f"{' …' if len(c) > 4 else ''} 이(가) 주 동선과 {g:.1f} m 떨어짐 "
@@ -1235,7 +1251,7 @@ register(ConstraintDef(
     id="CIRC-CONNECT",
     name="동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다",
     basis="복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 "
-          "(예: IBC 2021 §1020.2 복도 44 in = 1.118 m, ASR A1.8 표 1).",
+          "(예: IBC 2021 Table 1020.3 복도 44 in = 1.118 m, ASR A1.8 표 2).",
     formula="층마다 동선 블록 그래프(맞닿은 길이 ≥ min_width)가 연결요소 1개이고, must_include 종류를 포함",
     params=dict(
         min_width_m=P("m", None, True, "이어진 것으로 보는 맞닿은 길이 하한 = 복도 최소 폭. 인용 필수."),
@@ -1271,6 +1287,14 @@ def _eval_egress(ctx: EvalContext, p: dict) -> List[Violation]:
                                  10.0 * (min_exits - len(stairs)), "count", True, []))
         if not stairs:
             continue
+        g0 = int(_get(p, "ground_floor", cid))
+        for i, r in items:
+            if sp.blocks[i].circulation in stypes and f > g0:
+                fs = ctx.spans(i)
+                if not all(k in fs for k in range(g0, f + 1)):
+                    out.append(Violation(cid, f"{sp.blocks[i].id}: {f+1}층 계단이 피난층({g0+1}층)까지 이어지지 않음 "
+                                              f"(이 계단의 층: {', '.join(str(k + 1) for k in fs)})",
+                                         5.0, "m", True, [sp.blocks[i].id], marker=dict(kind="rect", floor=f, a=r)))
         sc = [(r[0] + r[2] / 2, r[1] + r[3] / 2) for r in stairs]
         for i, r in occ:
             cx, cy = r[0] + r[2] / 2, r[1] + r[3] / 2
@@ -1303,6 +1327,7 @@ register(ConstraintDef(
         exit_separation_frac=P("ratio", None, False, "계단 간 최소 거리 / 층 대각선 (IBC 1007.1.1: 1/3 스프링클러, 1/2 비스프링클러)."),
         applies_to=P("kinds", ["room", "equipment"], False, ""),
         exempt=P("regex", None, False, "상주 인원이 없는 실(옥탑 기계실 등) — 피난 거리·출구 수 검사에서 뺀다."),
+        ground_floor=P("index", 0, False, "피난층(0 부터). 위층 계단은 이 층까지 끊김 없이 이어져야 한다."),
     ),
     evaluate=_eval_egress, hard=True, default_weight=2000.0,
 ))
@@ -1325,9 +1350,9 @@ def _eval_rack_serve(ctx: EvalContext, p: dict) -> List[Violation]:
                 out.append(Violation(cid, f"{f+1}층에 배관대가 없다", 50.0, "m", True, []))
             continue
         wmin = min(min(rect[i][2], rect[i][3]) for i in racks) * 0.5
-        comps = _components(racks, rect, lambda i, j: _touch_len(rect[i], rect[j], tol)[0] >= wmin)
+        comps = _components(racks, rect, lambda i, j: _touch_len(rect[i], rect[j], _tol_of(ctx, i, j, tol))[0] >= wmin)
         for c in (comps[1:] if _get(p, "connected", cid) else []):
-            g = min(_touch_len(rect[a], rect[b], tol)[1] for a in c for b in comps[0])
+            g = min(_touch_len(rect[a], rect[b], _tol_of(ctx, a, b, tol))[1] for a in c for b in comps[0])
             out.append(Violation(cid, f"배관대가 끊겼다 ({', '.join(sp.blocks[i].id for i in c[:3])} 가 {g:.1f} m 떨어짐)",
                                  g + wmin, "m", True, [sp.blocks[i].id for i in c]))
         for i in served:

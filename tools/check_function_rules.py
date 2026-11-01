@@ -7,7 +7,7 @@ check_function_rules.py — 어떤 data.js 의 배치(현황·최적화)를 '기
   python3 tools/check_function_rules.py /tmp/old.js
 
 docs/data.js 의 previous_area_only.new_rule_violations 는 이 스크립트로 잰 값이다
-(최적화 배치 기준; 동선 요소는 이름으로 판별하고 계단 중복 제거·복도 분할은 하지 않는 근사).
+(최적화 배치 기준; asis_rule_violations 는 같은 방법으로 잰 현황. 동선 요소는 이름으로 판별하고 계단 중복 제거·코어 묶기·복도 분할은 하지 않는 근사 — 엔진의 현황 평가와 수치가 다르다).
 """
 import collections
 import json

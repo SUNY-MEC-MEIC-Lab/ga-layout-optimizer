@@ -163,12 +163,9 @@ def _previous():
         old = json.loads(src[src.index("=") + 1:].strip().rstrip(";"))
     except ValueError:
         return {}
-    prev = {}
-    for c in old:
-        prev[c["key"]] = c.get("previous_area_only") or dict(
-            footprint=c["optimized"]["footprint"], link=c["optimized"].get("link"),
-            hard=c["optimized"]["hard"], pct=c["footprint_reduction_pct"])
-    return prev
+    # 기준선(면적만 본 실행)은 이미 previous_area_only 로 옮겨져 있다 — 그것만 이어받는다.
+    # (예전에는 없으면 지난 결과를 기준선으로 썼는데, 기능 유지 결과가 '이전(면적만)' 칸에 들어가는 버그가 됐다.)
+    return {c["key"]: c["previous_area_only"] for c in old if c.get("previous_area_only")}
 
 
 def main():

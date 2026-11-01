@@ -192,6 +192,8 @@ def apply_program(ir: dict, prog: dict, tol: float = 0.05) -> List[str]:
             if b.get("circulation") != "corridor" or b.get("pinned"):
                 continue
             w, d = b["w"], b["d"]
+            if max(w, d) < 1.5 * min(w, d):
+                continue        # 정사각형에 가까운 복도 조각(교차부)은 어느 쪽이 폭인지 모른다 — 두고 본다
             if w <= d and abs(w - wm) > 0.01:
                 b["_program"] = f"복도 폭 {w:.2f} → {wm:g} m ({cor.get('basis', '')})"; b["w"] = wm; n += 1
             elif d < w and abs(d - wm) > 0.01:
@@ -270,7 +272,9 @@ def _stack_cores(ir: dict, asis: Optional[dict]) -> List[str]:
                     continue
                 ox = min(a["x"] + a["w"], ac["x"] + ac["w"]) - max(a["x"], ac["x"])
                 oy = min(a["y"] + a["d"], ac["y"] + ac["d"]) - max(a["y"], ac["y"])
-                if ox > 0.5 * min(a["w"], ac["w"]) and oy > 0.5 * min(a["d"], ac["d"]):
+                # 경계값(정확히 절반 겹침)도 같은 코어로 본다 — 엄격 부등호였을 때 SMR 1층 계단이
+                # 위층 계단과 묶이지 않아 엉뚱한 곳에 놓였다 (독립 검증에서 발견).
+                if ox >= 0.5 * min(a["w"], ac["w"]) - 1e-6 and oy >= 0.5 * min(a["d"], ac["d"]) - 1e-6:
                     nxt = c
                     break
             if nxt is None:
@@ -291,4 +295,8 @@ def _stack_cores(ir: dict, asis: Optional[dict]) -> List[str]:
         base["_program"] = f"수직 코어: {', '.join(g['id'] for g in grp)} 를 {f0+1}–{f1+1}층 한 블록으로"
         gone |= {g["id"] for g in grp[1:]}
     _drop(ir, gone)
-    return [f"수직 코어 {len(groups)}개 (계단·엘리베이터 {len(gone) + len(groups)}개를 층 관통 블록으로 묶음)"] if groups else []
+    alone = [b["id"] for b in cores if b["id"] not in used or
+             (b["id"] not in gone and not any(b is g[0] for g in groups))]
+    warn = [f"⚠ 다른 층과 묶이지 않은 계단·승강기 {len(alone)}개: {', '.join(alone[:8])} — "
+            f"EGRESS 가 계단 연속성을 검사한다"] if alone else []
+    return warn + [f"수직 코어 {len(groups)}개 (계단·엘리베이터 {len(gone) + len(groups)}개를 층 관통 블록으로 묶음)"] if groups else []

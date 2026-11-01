@@ -61,6 +61,43 @@ class TestAccess(unittest.TestCase):
         self.assertEqual([x.blocks for x in _viols(sp, pl, "CIRC-ACCESS")], [["R3"]])
 
 
+class TestReviewFindings(unittest.TestCase):
+    """독립 검증(2026-11-01)에서 나온 문제의 회귀 시험."""
+
+    def test_cores_stack_at_exact_half_overlap(self):
+        ir = {"blocks": [{"id": "C1", "name": "STAIR", "w": 6.0, "d": 6.0, "kind": "room"},
+                         {"id": "C2", "name": "STAIR", "w": 6.0, "d": 6.0, "kind": "room"}],
+              "links": [], "separations": [], "floor_heights": [8.0, 8.0]}
+        asis = {"blocks": {"C1": dict(x=0, y=14.5, w=6, d=6, floor=0), "C2": dict(x=0, y=11.5, w=6, d=6, floor=1)}}
+        PROGRAM.apply_program(ir, {"stack_cores": True, "_asis": asis})
+        self.assertEqual([b["id"] for b in ir["blocks"]], ["C1"], "정확히 절반 겹친 계단도 한 코어")
+
+    def test_contact_measured_on_body_not_clearance(self):
+        # 복도 x 0–20. 기기 본체 4×3, 이격 1.5 m (배치 좌표는 이격 포함 외곽의 좌하단).
+        sp = spec([_corr("C1", 20.0, 2.0), B("P1", w=4.0, d=3.0, clearance=1.5, kind="equipment")],
+                  constraints=[{"id": "CIRC-ACCESS", "params": {"door_m": 1.2, "via_rooms": 0, "touch_tol_m": 0.2,
+                                                                "applies_to": ["equipment"]}}])[0]
+        # 본체 x 6.5–10.5 가 복도 앞 1.5 m(이격 공간) 에 있다 → 출입 가능
+        self.assertEqual(_viols(sp, {"C1": (0, 0, 0), "P1": (5, 2, 0)}, "CIRC-ACCESS"), [])
+        # 본체 x 20.0–24.0 — 복도와 정면으로 겹치는 길이 0. 이격 외곽(18.5–25.5)으로 재면 1.5 m 겹쳐 통과했던 경우
+        v = _viols(sp, {"C1": (0, 0, 0), "P1": (18.5, 2, 0)}, "CIRC-ACCESS")
+        self.assertEqual([x.blocks for x in v], [["P1"]])
+
+    def test_direct_access_room(self):
+        sp = spec([_corr("C1", 20.0, 2.0), _room("CORE", 4, 4), _room("OR1", 4, 4, ),],
+                  constraints=[{"id": "CIRC-ACCESS", "params": {"door_m": 0.9, "via_rooms": 1, "touch_tol_m": 0.2,
+                                                                "direct": "^OR"}}])[0]
+        pl = {"C1": (0, 0, 0), "CORE": (0, 2, 0), "OR1": (0, 6, 0)}      # OR1 은 CORE 를 거쳐야 함
+        self.assertEqual([v.blocks for v in _viols(sp, pl, "CIRC-ACCESS")], [["OR1"]])
+
+    def test_upper_stair_must_reach_ground(self):
+        sp = spec([_stair("S1"), _stair("S2"), _room("R1", 4, 4)], n_floors=2, floor_heights=[4.0, 4.0],
+                  constraints=[{"id": "EGRESS", "params": {"max_travel_m": 100.0, "min_exits": 1}}])[0]
+        c = ctx(sp, {"S1": (0, 0, 0), "S2": (40, 0, 1), "R1": (10, 0, 1)})        # S2 는 2층에만 있다
+        v = CONS.REGISTRY["EGRESS"].evaluate(c, c.params_of("EGRESS"))
+        self.assertTrue(any("피난층" in x.detail for x in v))
+
+
 class TestConnectEgress(unittest.TestCase):
 
     def test_broken_corridor(self):
