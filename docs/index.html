@@ -205,6 +205,51 @@ details.more li b{color:var(--fg);font-weight:600}
 .note code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--mut)}
 @media (max-width:760px){.note{grid-template-columns:1fr;gap:10px}}
 
+/* ---- benchmark section ---- */
+.btabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.btab{flex:none;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 18px 10px 0;margin-right:18px;cursor:pointer;color:var(--mut);font:inherit;font-size:14.5px;white-space:nowrap}
+.btab .no{font-size:11.5px;letter-spacing:.06em;color:var(--mut2);margin-right:8px}
+.btab:hover{color:var(--fg)}
+.btab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--fg);font-weight:600}
+.btab[aria-selected="true"] .no{color:var(--acc)}
+.bench{border-top:1px solid var(--line);margin-top:64px;padding-top:44px}
+.bench-h .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--mut);font-weight:600}
+.bench-h h2{font-family:var(--serif);font-weight:600;font-size:clamp(24px,3vw,34px);margin:6px 0 10px;letter-spacing:-.01em}
+.bench-h p{max-width:760px;color:var(--mut);margin:0 0 26px;word-break:keep-all}
+.bench-h b{color:var(--fg);font-weight:600}
+.bsub{font-size:17px;margin:30px 0 12px;font-weight:600}
+.bsub small{display:block;font-weight:400;color:var(--mut2);font-size:12.5px;margin-top:2px}
+.bfig{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:14px 0 16px}
+.bfig .bn{padding:14px 16px 14px 0}
+.bfig .bn+.bn{padding-left:16px;border-left:1px solid var(--line2)}
+.bfig .lbl{display:block;font-size:12.5px;color:var(--mut)}
+.bfig b{display:block;font-size:clamp(22px,2.6vw,32px);font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin:4px 0 2px}
+.bfig b.good{color:var(--good)} .bfig b.warn{color:var(--warn)}
+.bfig small{color:var(--mut2);font-size:12.5px;font-variant-numeric:tabular-nums}
+.bgrid{display:grid;grid-template-columns:1.25fr 1fr;gap:20px;align-items:start}
+.bcanvas{height:min(56vh,520px)}
+.bcanvas .vtag{position:absolute;left:14px;top:12px;font-size:12px;color:var(--mut);pointer-events:none}
+.bcanvas .vtag b{display:block;color:var(--fg);font-size:13px}
+.bside .chart{margin:0}
+.bside svg{width:100%;height:auto;font:11px var(--sans);fill:var(--mut)}
+.bside svg .gl{stroke:var(--line2)} .bside svg .ax{fill:var(--mut2)}
+.bside svg path{fill:none;stroke-width:2}
+.bside svg path.published{stroke:var(--mut)} .bside svg path.best{stroke:var(--acc)}
+.bside svg circle.published{fill:var(--mut)} .bside svg circle.best{fill:var(--acc)}
+.bside figcaption{font-size:12px;color:var(--mut);margin-top:4px}
+.bside .k{display:inline-block;width:14px;height:2px;vertical-align:middle;margin:0 5px 0 10px}
+.bside .k.pub{background:var(--mut)} .bside .k.ours{background:var(--acc)}
+.bnote{font-size:13px;color:var(--mut);word-break:keep-all;margin:12px 0}
+.bt{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums;margin-top:6px}
+.bt th{font-weight:500;color:var(--mut);text-align:left;font-size:12px;border-bottom:1px solid var(--line);padding:6px 8px 6px 0}
+.bt td{border-bottom:1px solid var(--line2);padding:8px 8px 8px 0;vertical-align:top}
+.bt td small{display:block;color:var(--mut2);font-size:11.5px}
+.bt .n{text-align:right;white-space:nowrap}
+.bt th:not(:first-child){text-align:right}
+.bt .bar{display:inline-block;width:60px;height:4px;background:var(--line2);vertical-align:middle;margin-right:8px;position:relative}
+.bt .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc)}
+.bcols{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:10px}
+@media (max-width:820px){.bgrid,.bcols{grid-template-columns:1fr}.bfig{grid-template-columns:1fr}.bfig .bn+.bn{border-left:0;padding-left:0;border-top:1px solid var(--line2)}.bt{font-size:12.5px}}
 .stage:fullscreen{background:var(--bg);padding:20px 24px;overflow:auto}
 .stage:fullscreen .canvas{height:calc(100vh - 150px)}
 .pkey{display:inline-block;font-size:12px;color:var(--mut2);align-self:center;margin-right:6px}
@@ -240,6 +285,7 @@ details.more li b{color:var(--fg);font-weight:600}
     </ol>
   </section>
 
+  <div class="cases-wrap">
   <nav class="cases" role="tablist" id="tabs" aria-label="사례"></nav>
 
   <div class="case" id="case">
@@ -309,6 +355,41 @@ details.more li b{color:var(--fg);font-weight:600}
     <details class="viol ev" id="viol"><summary>어긴 규칙 자세히 보기</summary><ul id="viol-list"></ul></details>
   </div>
 
+  </div><!-- /cases-wrap: 사례 탭은 이 안에서만 위에 붙는다 -->
+
+  <section class="bench" id="bench">
+    <div class="bench-h">
+      <span class="eyebrow">벤치마크</span>
+      <h2>정답이 알려진 문제로 검증했습니다</h2>
+      <p>위 사례들은 정답을 모릅니다. 그래서 같은 탐색 엔진을 <b>논문이 정답(전역 최적)을 공개한 문제</b>에 돌려, 정답과 얼마나 차이 나는지 쟀습니다. 문제와 비용식은 논문 그대로이고, 결과는 엔진과 별개인 검사로 실현가능한지 확인했습니다.</p>
+    </div>
+
+    <h3 class="bsub">다층 공정 플랜트 배치 <small>Ejeh, Liu, Papageorgiou (2019), Comput. Chem. Eng. 131 · 부록 B 데이터</small></h3>
+    <nav class="btabs" role="tablist" id="b-tabs" aria-label="플랜트"></nav>
+    <div class="bfig" id="b-fig"></div>
+    <div class="bgrid">
+      <div class="canvas bcanvas" id="b-canvas"><div class="tip"></div><span class="vtag"><b>이 엔진의 최선 배치</b><small>층을 띄워 그림 · 마우스를 올리면 기기 이름</small></span></div>
+      <div class="bside">
+        <div id="b-chart"></div>
+        <p class="bnote">비용 = 배관 + 펌핑 + 층 건설 + 땅값 (논문 식 10). 바닥 크기는 5 m 단위 후보 중에서 고르고, 같은 층 기기는 최소 이격을 지킵니다. LNG 는 압축기 3단 적층과 1층 50%·최상층 60% 비우기 조건까지 넣었습니다. <span id="b-note"></span></p>
+      </div>
+    </div>
+    <div id="b-ejeh"></div>
+    <p class="bnote">기기가 많아질수록 차이가 커집니다. 증명된 최적보다 싼 해는 한 번도 나오지 않았습니다 — 비용식과 조건을 논문과 같게 구현했다는 하한 검사입니다.</p>
+
+    <div class="bcols">
+      <div>
+        <h3 class="bsub">시설 배치 표준 문제 <small>QAPLIB · 공개 최적해</small></h3>
+        <div id="b-qap"></div>
+      </div>
+      <div>
+        <h3 class="bsub">실제 원전 계통 배치 <small>Wrigley et al. (2019) · Shearon Harris 데이터</small></h3>
+        <div id="b-wr"></div>
+        <p class="bnote">논문의 기준안(14,914)과 최적(8,036)은 공개 미리보기에서 확인했습니다. 안전계통 배치·거리 정의가 본문에만 있어 같은 문제라고 단정할 수 없습니다.</p>
+      </div>
+    </div>
+  </section>
+
   <footer class="note">
     <div>
       <h4>꼭 알아 두세요</h4>
@@ -323,6 +404,7 @@ details.more li b{color:var(--fg);font-weight:600}
 </div>
 
 <script src="data.js"></script>
+<script src="bench.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -876,5 +958,6 @@ if (CASES.length) {
   show(0); resize(); frame(CASES[0]); renderAll(); $("case").dataset.ready = 1;
 } else document.querySelector(".wrap").insertAdjacentHTML("beforeend", "<p>data.js 를 불러오지 못했습니다.</p>");
 </script>
+<script type="module" src="bench-view.js"></script>
 </body>
 </html>

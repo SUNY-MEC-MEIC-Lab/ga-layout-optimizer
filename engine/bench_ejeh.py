@@ -195,14 +195,30 @@ def solve(inst: dict, seed: int, iters: int, restarts: int) -> Tuple[object, dic
     return best, dict(evaluate(inst, spec, best), violations=check_solution(inst, spec, best), spec=spec)
 
 
-def run(path: str, plant: str, seeds: List[int], iters: int, restarts: int, K: Optional[int] = None) -> dict:
+def layout(inst: dict, spec, sol) -> dict:
+    """3D 보기용 — 기기 본체의 위치(원점을 바닥 모서리로 옮김)·층·높이."""
+    body, _ = _bodies(spec, sol)
+    x0 = min(b[0] for b in body.values()); y0 = min(b[1] for b in body.values())
+    FH = inst["P"]["FH"]
+    r = evaluate(inst, spec, sol)
+    return dict(X=r["X"], Y=r["Y"], NF=r["NF"], FH=FH, items=[
+        dict(no=no, name=inst["items"][no]["name"], x=round(b[0] - x0, 3), y=round(b[1] - y0, 3),
+             w=round(b[2], 3), d=round(b[3], 3), f=b[4], z=round(FH * b[4], 3),
+             h=round(inst["items"][no]["gamma"], 3)) for no, b in sorted(body.items())])
+
+
+def run(path: str, plant: str, seeds: List[int], iters: int, restarts: int, K: Optional[int] = None,
+        keep_layout: bool = False) -> dict:
     inst = load(path, plant, K)
     pub = (SWEEP.get(plant, {}).get(int(inst["P"]["K"])) if K is not None else PUBLISHED[plant]["cost"])
     rows = []
+    best_lay, best_total = None, float("inf")
     for s in seeds:
         t0 = time.time()
         sol, r = solve(inst, s, iters, restarts)
         ok = not r["violations"]
+        if keep_layout and ok and r["total"] < best_total:
+            best_total, best_lay = r["total"], dict(layout(inst, r["spec"], sol), seed=s)
         rows.append(dict(seed=s, total=round(r["total"], 1), feasible=ok, NF=r["NF"], X=r["X"], Y=r["Y"],
                          gap_pct=round((r["total"] - pub) / pub * 100, 2) if pub else None,
                          violations=r["violations"][:5], wall_s=round(time.time() - t0, 1)))
@@ -212,7 +228,7 @@ def run(path: str, plant: str, seeds: List[int], iters: int, restarts: int, K: O
                 demin_note=DEMIN_NOTE.get(plant, ""), runs=rows,
                 best_gap_pct=gaps[0] if gaps else None,
                 median_gap_pct=statistics.median(gaps) if gaps else None,
-                feasible=len(feas), n=len(rows))
+                feasible=len(feas), n=len(rows), layout=best_lay)
 
 
 def main(argv=None) -> int:
