@@ -327,6 +327,7 @@ details.more li b{color:var(--fg);font-weight:600}
         <label class="sw"><input type="checkbox" id="c-model" checked><span>실제 모양으로 보기</span></label>
         <label class="sw"><input type="checkbox" id="c-viol" checked><span>어긴 기기 빨갛게</span></label>
         <label class="sw"><input type="checkbox" id="c-ghost" checked><span>원래 건물 크기 점선</span></label>
+        <label class="sw" title="방마다 어느 복도로(또는 어느 방을 거쳐) 드나드는지 문 위치를 표시합니다. 방에 마우스를 올리면 복도까지의 경로가 보입니다."><input type="checkbox" id="c-door" checked><span>문·동선</span></label>
         <label class="sw"><input type="checkbox" id="c-spin"><span>자동 회전</span></label>
         <label class="sw" style="cursor:default"><span>층 띄워 보기</span><input type="range" id="c-explode" min="0" max="30" value="0" aria-label="층 띄워 보기"></label>
         <span class="sp"></span>
@@ -564,6 +565,7 @@ function build(v, c, layout, colors, ghost) {
   const W = layout.width, D = layout.depth;
   const base = floorBase(c);
   const cx = W / 2, cy = D / 2;
+  v.layout = layout; v.cx = cx; v.cy = cy; v.base = base; v.path = null;
   const bad = new Set(layout.violations.flatMap(x => x.blocks));
   const why = {};
   for (const x of layout.violations) for (const id of x.blocks) (why[id] ||= []).push(x.detail);
@@ -655,6 +657,8 @@ function build(v, c, layout, colors, ghost) {
   }
 }
 
+const _buildCore = build;
+build = function (v, c, layout, colors, ghost) { _buildCore(v, c, layout, colors, ghost); drawDoors(v, c, layout); };
 const shortName = n => n.replace(/\s*\(.*?\)\s*/g, " ").replace(/^[A-Z0-9-]+\s+(?=[가-힣])/, "").trim();
 
 function frame(c) {
@@ -684,6 +688,7 @@ function setHover(id, from) {
     if (w === from) w.tag.visible = false;            // 올린 쪽은 툴팁이 이름을 보여 준다
     w.tag.position.set(o.position.x, o.position.y + h + 1, o.position.z);
   }
+  for (const w of Object.values(views)) drawPath(w, morphT >= .999 || w !== views.opt ? id : null);
   renderAll();
 }
 
@@ -903,6 +908,50 @@ function renderFunc(c) {
 // 같은 id 의 블록은 현황 자리에서 새 자리로 날아가고(크기가 바뀐 실은 크기도), 없어진 구간은 사라지고,
 // 새로 생긴 구간(배관대 조각 등)은 나타난다. 위치·크기는 data.js 의 두 배치를 그대로 보간할 뿐이다.
 let morphT = 1, morphItems = [], morphSlabs = null, playRaf = 0;
+// 문 — 방이 드나드는 벽(복도 또는 거쳐 가는 방과 맞닿은 곳)에 문짝 크기의 막대를 세운다.
+function drawDoors(v, c, layout) {
+  if (!$("c-door").checked || !layout.access) return;
+  const mat = new THREE.MeshStandardMaterial({ color: accHex(), roughness: .5, emissive: accHex(), emissiveIntensity: .25 });
+  for (const [id, e] of Object.entries(layout.access)) {
+    const [x, y, w, d] = e.door;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(w, .3), 2.1, Math.max(d, .3)), mat);
+    m.position.set(x + w / 2 - v.cx, v.base[e.f] + explode * e.f + 1.05, y + d / 2 - v.cy);
+    m.userData.door = true;
+    v.root.add(m);
+  }
+}
+// 마우스를 올린 방에서 복도까지의 경로 — 방 중심 → 문 → (거쳐 가는 방 중심 → 문) → 복도
+function drawPath(w, id) {
+  if (w.path) { w.root.remove(w.path); w.path = null; }
+  const L = w.layout;
+  if (!id || !L || !L.access || !L.access[id] || !$("c-door").checked) return;
+  const byId = Object.fromEntries(L.blocks.map(b => [b.id, b]));
+  const pts = []; let cur = id, guard = 0;
+  const lift = e => w.base[e.f] + explode * e.f + 1.3;
+  while (L.access[cur] && guard++ < 6) {
+    const e = L.access[cur], b = byId[cur];
+    pts.push(new THREE.Vector3(b.x + b.w / 2 - w.cx, lift(e), b.y + b.d / 2 - w.cy));
+    const [x, y, dw, dd] = e.door;
+    const dp = new THREE.Vector3(x + dw / 2 - w.cx, lift(e), y + dd / 2 - w.cy);
+    pts.push(dp);
+    const nb = byId[e.to];
+    if (!nb || nb.circ) {                                   // 복도에 닿았다 — 복도 안쪽으로 한 걸음
+      if (nb) {
+        const cxn = Math.min(Math.max(dp.x, nb.x - w.cx + .6), nb.x + nb.w - w.cx - .6);
+        const czn = Math.min(Math.max(dp.z, nb.y - w.cy + .6), nb.y + nb.d - w.cy - .6);
+        pts.push(new THREE.Vector3(cxn, lift(e), czn));
+      }
+      break;
+    }
+    cur = e.to;
+  }
+  if (pts.length < 2) return;
+  const g = new THREE.Group();
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: accHex(), linewidth: 2 })));
+  for (const p of pts.slice(1)) { const s = new THREE.Mesh(new THREE.SphereGeometry(.35, 12, 8), new THREE.MeshBasicMaterial({ color: accHex() })); s.position.copy(p); g.add(s); }
+  w.path = g; w.root.add(g);
+}
+
 function prepareMorph(c, colors) {
   const v = views.opt, a = c.asis, o = c.optimized;
   morphItems = []; morphSlabs = { sx: a.width / Math.max(o.width, 1e-6), sz: a.depth / Math.max(o.depth, 1e-6) };
@@ -937,6 +986,7 @@ function applyMorph(t) {
   morphT = t;
   const v = views.opt;
   v.root.children.forEach(ch => {
+    if (ch.userData.door) ch.visible = t >= .999;
     if (ch.userData.slab && morphSlabs) {
       ch.scale.x = morphSlabs.sx + (1 - morphSlabs.sx) * ease(t);
       ch.scale.z = morphSlabs.sz + (1 - morphSlabs.sz) * ease(t);
@@ -1013,6 +1063,7 @@ function openBench() {
 }
 $("c-viol").onchange = () => rebuild(true);
 $("c-play").onclick = play;
+$("c-door").onchange = () => rebuild(true);
 $("c-morph").oninput = e => { stopPlay(); applyMorph(+e.target.value / 1000); };
 $("c-model").onchange = () => rebuild(true);
 $("c-ghost").onchange = () => rebuild(true);

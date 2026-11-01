@@ -1133,6 +1133,9 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
     ext_rx = re.compile(ext_rx, re.I) if ext_rx else None
     direct = _get(p, "direct", cid)
     direct = re.compile(direct, re.I) if direct else None
+    thr = _get(p, "through_ok", cid)
+    thr = re.compile(thr, re.I) if thr else None
+    cfor = [(re.compile(a, re.I), re.compile(b, re.I)) for a, b in (_get(p, "corridor_for", cid) or [])]
     sp = ctx.spec
     out: List[Violation] = []
     for f in range(sp.n_floors):
@@ -1165,17 +1168,31 @@ def _eval_circ_access(ctx: EvalContext, p: dict) -> List[Violation]:
                 L, _g = _touch_len(ri, rect[j], _tol_of(ctx, i, j, tol))
                 if L >= door:
                     adj[i].append(j); adj[j].append(i)
-        depth = {i: 0 for i in circ}
-        q = list(circ)
+        # 실마다 '드나들 수 있는 복도' 를 정할 수 있다 (예: 수술실 → 청결 복도). 정하지 않으면 모든 동선.
+        def allowed_circ(i):
+            for rx, crx in cfor:
+                if rx.search(sp.blocks[i].name or ""):
+                    return {c for c in circ if crx.search(sp.blocks[c].name or "")}
+            return set(circ)
         circ_set = set(circ)
+        depth = {}
+        # 1단계: 허용된 복도에 직접 맞닿은 실
+        for i in rooms:
+            if any(j in allowed_circ(i) for j in adj[i]):
+                depth[i] = 1
+        # 2단계 이상: 이미 들어갈 수 있는 실을 거쳐서 — 단, 통로로 써도 되는 실(through_ok)만 거친다
+        q = [i for i in rooms if i in depth]
         while q:
             nq = []
             for i in q:
+                if depth[i] >= via + 1 or (thr and not thr.search(sp.blocks[i].name or "")):
+                    continue
                 for j in adj[i]:
-                    if j in depth or j in circ_set:
+                    if j in depth or j in circ_set or j not in rooms:
                         continue
-                    if depth[i] + 1 > via + 1:
-                        continue
+                    if cfor and allowed_circ(j) != circ_set and not any(
+                            depth.get(k) == 1 and set(adj[k]) & allowed_circ(j) for k in [i]):
+                        continue                    # 지정 복도가 있는 실은 그 복도 쪽 실을 거쳐야 한다
                     depth[j] = depth[i] + 1
                     nq.append(j)
             q = nq
@@ -1211,6 +1228,8 @@ register(ConstraintDef(
         circulation_types=P("types", list(CIRC_DEFAULT), False, "동선으로 보는 circulation 값."),
         exterior_access=P("regex", None, False, "바깥 문으로 드나드는 실 이름 (예: YARD|TRASH|RECEIV) — 층 외곽에 닿으면 출입 가능."),
         direct=P("regex", None, False, "복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨)."),
+        through_ok=P("regex", None, False, "다른 실이 '거쳐 지나가도' 되는 실 이름. 정하면 그 외의 실(멸균 코어 등)은 통로로 못 쓴다."),
+        corridor_for=P("pairs", None, False, "[[실 이름 정규식, 복도 이름 정규식], …] — 그 실은 그 복도로만 드나든다 (청결/오염 동선 분리)."),
     ),
     evaluate=_eval_circ_access, hard=True, default_weight=2000.0,
 ))

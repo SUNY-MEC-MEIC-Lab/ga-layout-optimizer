@@ -88,6 +88,80 @@ def _blocks(spec, geo, fh, notes):
     return out
 
 
+def access_paths(blocks, params, cl, fh=None):
+    """
+    실마다 '어디로 드나드는가' — CIRC-ACCESS 와 같은 기준(문 폭 이상 맞닿음, 벽 두께+이격 허용, via_rooms)으로
+    복도에서 너비 우선 탐색해 부모(복도 또는 거쳐 가는 실)와 문 위치를 돌려준다. 그림용이며 판정은 엔진이 한다.
+    """
+    door = float(params.get("door_m", 0.9)); tol = float(params.get("touch_tol_m", 0.35))
+    via = int(params.get("via_rooms", 1))
+    ctypes = set(params.get("circulation_types") or ["corridor", "stair", "elevator", "lobby"])
+    kinds = set(params.get("applies_to") or ["room"])
+    import re as _re
+    thr = _re.compile(params["through_ok"], _re.I) if params.get("through_ok") else None
+    cfor = [(_re.compile(a, _re.I), _re.compile(b, _re.I)) for a, b in (params.get("corridor_for") or [])]
+    out = {}
+    blocks = list(blocks)
+    if fh:                                               # 여러 층을 관통하는 동선(계단 코어)은 위층에도 있다
+        for b in list(blocks):
+            if not b.get("circ"):
+                continue
+            acc_h, k = 0.0, b["f"]
+            while k < len(fh) - 1 and acc_h + fh[k] < b["h"] - 1e-6:
+                acc_h += fh[k]; k += 1
+                blocks.append(dict(b, f=k))
+    for f in sorted({b["f"] for b in blocks}):
+        fl = [b for b in blocks if b["f"] == f]
+        circ = [b for b in fl if b.get("circ") in ctypes]
+        rooms = [b for b in fl if not b.get("circ") and b["kind"] in kinds]
+
+        def touch(a, b):
+            t = tol + cl.get(a["id"], 0.0) + cl.get(b["id"], 0.0)
+            gx = max(b["x"] - (a["x"] + a["w"]), a["x"] - (b["x"] + b["w"]))
+            gy = max(b["y"] - (a["y"] + a["d"]), a["y"] - (b["y"] + b["d"]))
+            if gx <= t and gy < 0 and -gy >= door:      # 좌우로 맞닿음 — 문은 세로 벽에
+                y0 = max(a["y"], b["y"]); y1 = min(a["y"] + a["d"], b["y"] + b["d"])
+                x = (a["x"] + a["w"] + b["x"]) / 2 if a["x"] < b["x"] else (b["x"] + b["w"] + a["x"]) / 2
+                L = min(door * 1.2, y1 - y0)
+                return [round(x - 0.15, 3), round((y0 + y1) / 2 - L / 2, 3), 0.3, round(L, 3)]
+            if gy <= t and gx < 0 and -gx >= door:      # 위아래로 맞닿음 — 문은 가로 벽에
+                x0 = max(a["x"], b["x"]); x1 = min(a["x"] + a["w"], b["x"] + b["w"])
+                y = (a["y"] + a["d"] + b["y"]) / 2 if a["y"] < b["y"] else (b["y"] + b["d"] + a["y"]) / 2
+                L = min(door * 1.2, x1 - x0)
+                return [round((x0 + x1) / 2 - L / 2, 3), round(y - 0.15, 3), round(L, 3), 0.3]
+            return None
+        depth, frontier = {}, []
+        def okc(r):
+            for rx, crx in cfor:
+                if rx.search(r.get("name") or ""):
+                    return [c for c in circ if crx.search(c.get("name") or "")]
+            return circ
+        for r in rooms:                                  # 복도에 바로 닿는 실
+            best = None
+            for c in okc(r):
+                d = touch(r, c)
+                if d:
+                    best = (c, d); break
+            if best:
+                depth[r["id"]] = 1; frontier.append(r)
+                out[r["id"]] = dict(to=best[0]["id"], door=best[1], depth=1, f=f)
+        k = 1
+        while frontier and k < via + 1:                  # 다른 실을 거쳐 들어가는 실
+            k += 1; nxt = []
+            for r in rooms:
+                if r["id"] in depth:
+                    continue
+                for q in frontier:
+                    if thr and not thr.search(q.get("name") or ""):
+                        continue                         # 통로로 쓰면 안 되는 실은 거치지 않는다
+                    d = touch(r, q)
+                    if d:
+                        depth[r["id"]] = k; nxt.append(r)
+                        out[r["id"]] = dict(to=q["id"], door=d, depth=k, f=f); break
+            frontier = nxt
+    return out
+
+
 def _metrics(m, viols, tol=1e-6):
     hard = [v for v in viols if v.hard and v.amount > tol]
     return dict(width=m["width_m"], depth=m["depth_m"], footprint=m["footprint_m2"],
@@ -132,6 +206,8 @@ def run_case(c):
                                       hard=True, blocks=v["blocks"])) for v in res["hard_violations"]]
         cmp_ = s["comparison"]
         reqs = [dict(id=x["id"], why=x.get("_why", "")) for x in req.get("set", {}).get("constraints", [])]
+        acc = next((x["params"] for x in req.get("set", {}).get("constraints", []) if x["id"] == "CIRC-ACCESS"), None)
+        clmap = {b.id: b.clearance for b in spec.blocks if b.clearance}
         rec = dict(
             key=c["key"], title=c["title"], desc=c["desc"], floors=spec.n_floors, floor_heights=fh,
             asis=dict(blocks=_blocks(spec, a_sol.geo, fh, {}), **_metrics(s["asis"], a_viols, ASIS.ASIS_TOL)),
@@ -141,6 +217,9 @@ def run_case(c):
             removed=res.get("removed", []), program=ir.get("_program_report", []),
             requirements=reqs, req_note=req.get("_note", ""), req_sources=req.get("_sources", {}),
             result_sha256=s["result_sha256"], seed=SEED)
+        if acc:
+            rec["asis"]["access"] = access_paths(rec["asis"]["blocks"], acc, clmap, fh)
+            rec["optimized"]["access"] = access_paths(rec["optimized"]["blocks"], acc, clmap, fh)
         for k in ("real", "source", "source_url", "license", "changes"):
             if k in c:
                 rec[k] = c[k]

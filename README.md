@@ -13,9 +13,9 @@ Claude Code 플러그인 + MCP 서버(Claude · ChatGPT · Codex) + 브라우저
 > domains: petrochemical plant, offshore FPSO topside, hospital surgical suite, a nuclear auxiliary building, and two real
 > public BIM models (a medical-dental clinic and a research institute). Concept-study use only — NOT FOR CONSTRUCTION.
 
-[![병원 수술부 — 왼쪽 원래 도면, 오른쪽에서 실들이 기능 요건을 지키며 새 자리로 옮겨 가 바닥 면적이 2,068 m² 에서 1,808 m² 로 줄어든다](docs/readme/morph-hospital.gif)](https://hajun011103.github.io/ga-layout-optimizer/)
+[![FPSO 해상 플랜트 상부 — 왼쪽 원래 배치, 오른쪽에서 모듈들이 위험구역 이격과 크레인 작업반경을 지키며 새 자리로 옮겨 가 바닥 면적이 6,528 m² 에서 2,600 m² 로 줄어든다](docs/readme/morph-fpso.gif)](https://hajun011103.github.io/ga-layout-optimizer/)
 
-<sub>왼쪽은 원래 도면, 오른쪽은 같은 실들이 출입·동선·이격 요건을 지키며 새 자리로 옮겨 가는 과정 (병원 수술부, 2,068 → 1,808 m²).</sub>
+<sub>왼쪽은 원래 배치, 오른쪽은 같은 모듈들이 위험구역 이격·크레인 작업반경을 지키며 새 자리로 옮겨 가는 과정 (FPSO 상부, 가상 도면, 6,528 → 2,600 m²).</sub>
 
 **[3D 로 직접 돌려 보기 →](https://hajun011103.github.io/ga-layout-optimizer/)** 사례 6건과 벤치마크를 브라우저에서 돌려 보고, "변형 재생" 으로 배치가 바뀌는 과정을 볼 수 있다. 설치 필요 없음.
 
@@ -99,7 +99,8 @@ Gate 1 이후는 LLM 호출 0회로 재현된다. 자세한 구조와 제약 라
 
 가상 도면 4건과 실제 공개 BIM 2건에 같은 방식으로 돌렸다. 숫자와 3D 는 [웹페이지](https://hajun011103.github.io/ga-layout-optimizer/)에, 표·요건·가정은 [guide/RESULTS.md](guide/RESULTS.md) 에 있다.
 
-- 석유화학 플랜트·FPSO 상부·병원 수술부(가상)는 요건을 모두 지키며 바닥 면적이 −70.6 · −60.2 · −12.6% 줄었다. 석유화학은 도로를 반영하지 않아 과대평가일 수 있다.
+- 석유화학 플랜트·FPSO 상부(가상)는 요건을 모두 지키며 바닥 면적이 −70.6 · −60.2% 줄었다. 석유화학은 도로를 반영하지 않아 과대평가일 수 있다.
+- 병원 수술부(가상)는 수술실을 청결 복도에, 오염 처리실을 일반 복도에 붙이고 멸균 코어를 통로로 쓰지 못하게 하자 −2.8% 에 위반 2건으로 **채택 불가** — 앞서 보고한 −12.6% 는 수술 동선을 제대로 지키지 않아서 얻은 축소였다.
 - 원전 보조건물(가상)과 실제 의료·치과 클리닉은 요건을 다 지키지 못해 **채택 불가**, 실제 연구소는 현재 외곽을 넘어 **현황 유지** — 복잡한 동선망을 다시 짜는 것은 지금 탐색의 한계다.
 - **이 개선율을 성과로 쓰지 말 것.** 가상 도면은 여유 공간을 일부러 담은 합성 현황이고, 실제 기대치는 기존 연구대로 −10~15% 수준으로 본다.
 

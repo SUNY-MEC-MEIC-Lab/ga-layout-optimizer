@@ -44,7 +44,7 @@ IR 에는 이렇게 적는다.
 
 | ID | 이름 | 유형 | 근거 | 파라미터 |
 |---|---|---|---|---|
-| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access`, `direct` |
+| `CIRC-ACCESS` | 실 출입 — 모든 실은 복도에서 들어갈 수 있어야 한다 | hard | 실은 복도(또는 via_rooms 개 이하의 다른 실)를 거쳐 문으로 드나든다. 문 폭은 인용 값으로 넣는다 (예: ADA 2010 §404.2.3 문 순폭 32 in = 0.815 m, IBC 2021 §1010.1.1). | `door_m`*, `via_rooms`, `touch_tol_m`, `applies_to`, `circulation_types`, `exterior_access`, `direct`, `through_ok`, `corridor_for` |
 | `CIRC-CONNECT` | 동선 연결 — 층마다 복도·계단·엘리베이터가 하나로 이어져야 한다 | hard | 복도는 실과 계단을 잇는 하나의 망이어야 피난·이동이 된다. 최소 폭은 인용 값 (예: IBC 2021 Table 1020.3 복도 44 in = 1.118 m, ASR A1.8 표 2). | `min_width_m`*, `touch_tol_m`, `circulation_types`, `must_include` |
 | `EGRESS` | 피난 — 계단까지 거리·계단 수·계단 간 이격 | hard | IBC 2021 §1017.2 출구까지 보행거리, §1006.3 층당 출구 수, §1007.1.1 출구 간 이격(스프링클러 시 대각선의 1/3); 독일 MBO §35 / ASR A2.3 (계단까지 35 m). 값은 관할·용도에 맞게 인용해 넣는다. | `max_travel_m`*, `exit_types`, `min_exits`, `exit_separation_frac`, `applies_to`, `exempt`, `ground_floor` |
 | `ELEC-SEP` | 전기계통 물리적 분리 | hard | GDC 17 + RG 1.75 Rev.3. ★ 현행 RG 1.75 Rev.3 본문에는 수치 이격거리가 전혀 없다. IEEE Std 384-1992 채택 시 원문이 1981년판 대비 "특정 형상에 대해 이격거리 기준이 축소되었다"고 명시했다. | `groups`*, `min_horizontal_m`*, `citation`*, `barrier_pairs` |
@@ -88,6 +88,8 @@ IR 에는 이렇게 적는다.
 | `circulation_types` | types |  | `['corridor', 'stair', 'elevator', 'lobby']` | 동선으로 보는 circulation 값. |
 | `exterior_access` | regex |  | — | 바깥 문으로 드나드는 실 이름 (예: YARD/TRASH/RECEIV) — 층 외곽에 닿으면 출입 가능. |
 | `direct` | regex |  | — | 복도에 '직접' 접해야 하는 실 이름 (예: 수술실 — 침대가 다른 실을 거치면 안 됨). |
+| `through_ok` | regex |  | — | 다른 실이 '거쳐 지나가도' 되는 실 이름. 정하면 그 외의 실(멸균 코어 등)은 통로로 못 쓴다. |
+| `corridor_for` | pairs |  | — | [[실 이름 정규식, 복도 이름 정규식], …] — 그 실은 그 복도로만 드나든다 (청결/오염 동선 분리). |
 
 ---
 

@@ -98,6 +98,34 @@ class TestReviewFindings(unittest.TestCase):
         self.assertTrue(any("피난층" in x.detail for x in v))
 
 
+class TestHospitalCirculation(unittest.TestCase):
+    """병원 수술부에서 드러난 문제: 대기실을 복도로 치거나, 멸균 코어를 통로로 쓰거나, 청결/오염 복도가 섞임."""
+
+    def test_waiting_room_is_not_a_corridor(self):
+        self.assertIsNone(PROGRAM.circulation_of("PREOP 수술 전 대기", "room"))
+        self.assertEqual(PROGRAM.circulation_of("외래 대기실", "room"), "lobby")
+
+    def _sp(self, **params):
+        base = {"door_m": 0.9, "via_rooms": 1, "touch_tol_m": 0.2}
+        base.update(params)
+        return spec([_corr("CN", 20.0, 2.0, name="CORR-N 청결복도"), _corr("CS", 20.0, 2.0, name="CORR-S 일반복도"),
+                     _room("CORE", 4, 4, name="CORE 멸균"), _room("PACU", 4, 4, name="PACU 회복실"),
+                     _room("SOIL", 4, 4, name="SOIL 오염")],
+                    constraints=[{"id": "CIRC-ACCESS", "params": base}])[0]
+
+    def test_no_passing_through_sterile_core(self):
+        pl = {"CN": (0, 0, 0), "CS": (0, 30, 0), "CORE": (0, 2, 0), "PACU": (0, 6, 0), "SOIL": (10, 2, 0)}
+        self.assertEqual(_viols(self._sp(), pl, "CIRC-ACCESS"), [])               # 멸균 코어를 거쳐 회복실 — 예전엔 통과
+        v = _viols(self._sp(through_ok="SCRUB"), pl, "CIRC-ACCESS")
+        self.assertEqual([x.blocks for x in v], [["PACU"]])
+
+    def test_room_must_use_its_corridor(self):
+        pl = {"CN": (0, 0, 0), "CS": (0, 30, 0), "CORE": (0, 2, 0), "PACU": (5, 26, 0), "SOIL": (10, 2, 0)}
+        self.assertEqual(_viols(self._sp(), pl, "CIRC-ACCESS"), [])               # 오염실이 청결 복도에 — 예전엔 통과
+        v = _viols(self._sp(corridor_for=[["SOIL", "CORR-S"]]), pl, "CIRC-ACCESS")
+        self.assertEqual([x.blocks for x in v], [["SOIL"]])
+
+
 class TestConnectEgress(unittest.TestCase):
 
     def test_broken_corridor(self):

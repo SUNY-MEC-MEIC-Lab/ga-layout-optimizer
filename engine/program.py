@@ -33,7 +33,7 @@ CIRC_RX = [
     ("stair", re.compile(r"^\s*(STAIR|STAIRS|STAIRWELL)\b|^Stair:|Treppe|계단", re.I)),
     ("elevator", re.compile(r"^\s*(ELEVATOR|LIFT)\s*$|Aufzug|승강기|엘리베이터", re.I)),
     ("corridor", re.compile(r"CORRIDOR|\bCORR\b|^\s*HALL\b|^\s*VEST\b|Flur|Gang\b|복도", re.I)),
-    ("lobby", re.compile(r"LOBBY|Foyer|Eingang|WAITING|^\s*WAIT\b|RECEPT|로비|현관|대기", re.I)),
+    ("lobby", re.compile(r"LOBBY|Foyer|Eingang|WAITING|^\s*WAIT\b|RECEPT|로비|현관|대기실", re.I)),
 ]
 
 
