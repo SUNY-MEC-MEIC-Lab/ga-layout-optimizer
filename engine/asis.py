@@ -130,7 +130,12 @@ def overlaps(spec: G.Spec, sol: G.Solution) -> List[str]:
 # 비교 지표 — 현황 vs 최적화 (같은 목적함수, 같은 IR)
 # ---------------------------------------------------------------------------
 
-def metrics(spec: G.Spec, sol: G.Solution) -> dict:
+# 현황(도면) 좌표는 파서가 읽은 값이라 0.1 mm 단위의 반올림 오차가 있다. 이보다 작은 위반은
+# 도면 정밀도 안이므로 세지 않는다 (예: PDF 1:500 에서 고정 배관대가 '0.0006 m 이탈').
+ASIS_TOL = 0.01      # [m · m² · count] — count 단위 위반은 1 이상이라 영향 없음
+
+
+def metrics(spec: G.Spec, sol: G.Solution, tol: float = 1e-6) -> dict:
     F, terms, geo, env, viols, shadows = sol.evaluate(detail=True)
     W, D, H = env
     body = 0.0
@@ -141,7 +146,7 @@ def metrics(spec: G.Spec, sol: G.Solution) -> dict:
         body += b.w * b.d
     floors_used = max((g["f"] for g in geo.values()), default=0) + 1
     link_raw = terms.get("link", 0.0) / max(spec.wt("link"), 1e-12)
-    hard = [v for v in viols if v.hard and v.amount > 1e-6]
+    hard = [v for v in viols if v.hard and v.amount > tol]
     return dict(
         width_m=round(W, 3), depth_m=round(D, 3), height_m=round(H, 3),
         footprint_m2=round(W * D, 3), volume_m3=round(W * D * H, 3),

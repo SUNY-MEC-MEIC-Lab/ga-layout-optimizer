@@ -196,7 +196,7 @@ def main():
             imp="PDF 의 레이어(OCG)와 문자를 읽었다 — 장치 21 · 고정 파이프랙 3",
             questions="같은 질문 → 요건 파일: 가열로·압축기·탱크·제어실 화재/폭발 이격, 공정 배관 (가정값)",
             req="원전의 App.R 화재분리와 같은 구조의 제약",
-            result="현황 hard 위반 11 → 0, 건축면적 −9.0%",
+            result="현황 hard 위반 7 → 0, 건축면적 −9.0%",
         ))
         studio_flow(r, example="fpso_topside", effort="quick", glide=False, caps=dict(
             open="비교군 ② FPSO 상부 모듈 2개 데크 — SVG",

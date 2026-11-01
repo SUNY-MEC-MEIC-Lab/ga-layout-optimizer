@@ -206,6 +206,23 @@ class TestTools(unittest.TestCase):
                 self.assertEqual(after[k], v)
         self.assertEqual(after["ecc"], 9.0)
 
+    def test_asis_ignores_subdrawing_precision(self):
+        """PDF 1:500 좌표 반올림(0.6 mm)으로 생긴 '고정 배관대 0.00 m 이탈' 을 위반으로 세지 않는다."""
+        r = self.t.ga_load_example(name="chem_plant")
+        pid = r["project"]["project_id"]
+        self.t.ga_apply_example_requirements(project_id=pid, name="chem_plant")
+        d, ir = self.t._load_ir(pid)
+        a = self.t.ws.rjson(os.path.join(d, "asis.json"))
+        sp = G.spec_from_dict(ir)
+        sol = ASIS.AsIsSolution(sp, a)
+        strict = ASIS.metrics(sp, sol)
+        m = ASIS.metrics(sp, sol, tol=ASIS.ASIS_TOL)
+        ids = [v["id"] for v in m["hard_violations"]]
+        self.assertNotIn("FIXED", ids)
+        self.assertNotIn("ENVELOPE", ids)
+        self.assertLess(m["hard_violation_count"], strict["hard_violation_count"])
+        self.assertGreater(m["hard_violation_count"], 0, "실제 이격 위반까지 지우면 안 된다")
+
     def test_drawing_to_result_deterministic(self):
         r = self.t.ga_load_example(name="smr_aux")
         pid = r["project"]["project_id"]

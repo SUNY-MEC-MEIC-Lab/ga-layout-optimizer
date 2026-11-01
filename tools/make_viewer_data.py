@@ -56,8 +56,8 @@ def _blocks(spec, geo, fh):
     return out
 
 
-def _metrics(m, viols):
-    hard = [v for v in viols if v.hard and v.amount > 1e-6]
+def _metrics(m, viols, tol=1e-6):
+    hard = [v for v in viols if v.hard and v.amount > tol]
     return dict(width=m["width_m"], depth=m["depth_m"], footprint=m["footprint_m2"],
                 volume=m["volume_m3"], hard=m["hard_violation_count"],
                 violations=[dict(id=v.cid, detail=v.detail, blocks=list(v.blocks))
@@ -95,7 +95,7 @@ def build_case(t, tmp, name, title, desc):
     c = s["comparison"]
     return dict(
         key=name, title=title, desc=desc, floors=spec.n_floors, floor_heights=fh,
-        asis=dict(blocks=asis_blocks, **_metrics(s["asis"], a_viols)),
+        asis=dict(blocks=asis_blocks, **_metrics(s["asis"], a_viols, ASIS.ASIS_TOL)),
         optimized=dict(blocks=opt_blocks, **_metrics(s["optimized"], o_viols)),
         footprint_reduction_pct=c["footprint_reduction_pct"],
         volume_reduction_pct=c["volume_reduction_pct"],

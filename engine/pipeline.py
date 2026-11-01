@@ -134,7 +134,7 @@ def optimize_ir(ir: dict, out: str, *, mode: str = "sa", effort: str = "normal",
     asis_overlaps: List[str] = []
     if asis is not None and asis.get("blocks"):
         a_sol = ASIS.AsIsSolution(spec, asis)
-        asis_m = ASIS.metrics(spec, a_sol)
+        asis_m = ASIS.metrics(spec, a_sol, tol=ASIS.ASIS_TOL)
         asis_overlaps = ASIS.overlaps(spec, a_sol)
         F, t, geo, env, viols, sh = a_sol.evaluate(detail=True)
         for f in range(spec.n_floors):

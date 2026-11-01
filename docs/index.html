@@ -59,7 +59,13 @@ header p{margin:0;color:var(--mut);max-width:760px}
 .canvas{position:relative;height:min(62vh,520px);min-height:320px;background:var(--scene);margin:8px;border-radius:10px;overflow:hidden;touch-action:none}
 .canvas canvas{display:block;width:100%;height:100%}
 .tip{position:absolute;pointer-events:none;background:rgba(20,20,22,.92);color:#fff;font-size:13px;line-height:1.45;padding:8px 10px;border-radius:8px;max-width:280px;display:none;z-index:2}
-.tip .r{color:#ff9aa8}
+.tip .r{color:#ff9aa8;margin-top:4px}
+.tip{width:280px;max-width:calc(100% - 12px)}
+.tip .th{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.tip .th img{width:84px;height:63px;object-fit:contain;background:rgba(255,255,255,.08);border-radius:6px;flex:none}
+.tip .th b{font-size:14.5px;display:block}
+.tip .ty{color:#9ec1ff;font-size:12.5px}
+.tip .mt{color:#c9c9c4;font-size:12.5px;margin-top:4px}
 .controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:14px 0}
 .controls label{display:flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
 .controls input[type=range]{width:160px}
@@ -121,7 +127,6 @@ footer a{color:var(--acc)}
 
   <div class="controls">
     <label><input type="checkbox" id="c-model" checked> 실제 모양으로 보기</label>
-    <label><input type="checkbox" id="c-label" checked> 이름표</label>
     <label><input type="checkbox" id="c-viol" checked> 규칙을 어긴 기기 빨갛게 표시</label>
     <label><input type="checkbox" id="c-ghost" checked> 오른쪽에 원래 건물 크기 점선 표시</label>
     <label>층 띄워 보기 <input type="range" id="c-explode" min="0" max="30" value="0"></label>
@@ -140,7 +145,7 @@ footer a{color:var(--acc)}
     </section>
   </div>
   <div class="legend" id="legend"></div>
-  <p class="hint">끌어서 회전 · 휠/두 손가락으로 확대 · 오른쪽 버튼(또는 두 손가락 끌기)으로 이동 · 기기에 마우스를 올리면 이름이 보입니다. 두 화면의 시점은 함께 움직입니다.</p>
+  <p class="hint">끌어서 회전 · 휠/두 손가락으로 확대 · 오른쪽 버튼(또는 두 손가락 끌기)으로 이동 · 기기에 마우스를 올리면 이름·설명이 뜨고, 다른 화면에서도 같은 기기가 표시됩니다. 두 화면의 시점은 함께 움직입니다.</p>
 
   <section class="dex">
     <h3>블록 도감 — 이 도면에 나오는 것들</h3>
@@ -233,7 +238,13 @@ function makeView(el) {
   const labels = new CSS2DRenderer();
   labels.domElement.style.cssText = "position:absolute;inset:0;pointer-events:none";
   el.appendChild(labels.domElement);
-  const v = { el, renderer, labels, scene, root, tip: el.querySelector(".tip"), pick: [] };
+  const v = { el, renderer, labels, scene, root, tip: el.querySelector(".tip"), pick: [], byId: {} };
+  // 마우스를 올린 기기 표시 — 테두리 상자 + 이름표 (두 화면에 함께)
+  v.hl = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+                                new THREE.LineBasicMaterial({ color: 0x2357d6 }));
+  v.hl.visible = false; scene.add(v.hl);
+  const tagEl = document.createElement("div"); tagEl.className = "label";
+  v.tag = new CSS2DObject(tagEl); v.tag.visible = false; scene.add(v.tag);
   new ResizeObserver(() => resize()).observe(el);
   bindHover(v);
   return v;
@@ -252,21 +263,7 @@ function resize() {
 }
 
 function renderAll() {
-  for (const v of Object.values(views)) { v.renderer.render(v.scene, camera); v.labels.render(v.scene, camera); declutter(v); }
-}
-
-// 이름표가 겹치면 덜 중요한 것을 숨긴다 (위반 > 핵심 설비 > 큰 것 순)
-function declutter(v) {
-  const els = [...v.labels.domElement.querySelectorAll(".label")]
-    .filter(e => e.style.display !== "none")
-    .sort((a, b) => (+b.dataset.p) - (+a.dataset.p));
-  const shown = [];
-  for (const e of els) {
-    e.style.opacity = "1";
-    const r = e.getBoundingClientRect();
-    if (shown.some(q => r.left < q.right + 2 && r.right > q.left - 2 && r.top < q.bottom + 1 && r.bottom > q.top - 1)) e.style.opacity = "0";
-    else shown.push(r);
-  }
+  for (const v of Object.values(views)) { v.renderer.render(v.scene, camera); v.labels.render(v.scene, camera); }
 }
 
 function colorMap(c) {
@@ -289,8 +286,10 @@ function floorBase(c) {
 }
 
 function build(v, c, layout, colors, ghost) {
+  hoverId = null; v.hl.visible = v.tag.visible = false; v.tip.style.display = "none";
   v.root.clear();
   v.pick = [];
+  v.byId = {};
   const W = layout.width, D = layout.depth;
   const base = floorBase(c);
   const cx = W / 2, cy = D / 2;
@@ -325,7 +324,7 @@ function build(v, c, layout, colors, ghost) {
     v.root.add(line);
   }
   // 기기·방 — 모형(또는 상자) + 바닥 윤곽선 + 이름표
-  const useModel = $("c-model").checked, useLabel = $("c-label").checked;
+  const useModel = $("c-model").checked;
   for (const b of layout.blocks) {
     const type = classify(b);
     const isBad = showBad && bad.has(b.id);
@@ -354,6 +353,7 @@ function build(v, c, layout, colors, ghost) {
     obj.userData = { b, type, why: why[b.id] || [], label: (LABELS[c.key] || {})[b.group] || b.group };
     v.root.add(obj);
     v.pick.push(obj);
+    v.byId[b.id] = obj;
     // 블록이 차지하는 바닥 범위 (모형은 이 안에 들어간다)
     if (type !== "corridor") {
       const hw = b.w / 2, hd = b.d / 2;
@@ -369,25 +369,9 @@ function build(v, c, layout, colors, ghost) {
       hb.position.set(obj.position.x, obj.position.y + Math.max(b.h, 1) / 2, obj.position.z);
       v.root.add(hb);
     }
-    if (useLabel && !dim && showLabel(b, type, focusType)) {
-      const el = document.createElement("div");
-      el.className = "label" + (isBad ? " bad" : "");
-      el.textContent = b.kind === "obstacle" ? TYPES[type][0].replace(/·.*/, "") : shortName(b.name);
-      el.dataset.p = String(b.w * b.d + (KEY_TYPES.has(type) ? 1e5 : 0) + (isBad ? 1e6 : 0));
-      const lab = new CSS2DObject(el);
-      lab.position.set(obj.position.x, obj.position.y + Math.min(b.h, 6) + .5, obj.position.z);
-      v.root.add(lab);
-    }
   }
 }
 
-// 이름표는 큰 것·중요한 것만 (다 붙이면 읽을 수 없다). 도감에서 종류를 고르면 그 종류는 전부.
-const KEY_TYPES = new Set(["genset", "control", "pool", "column", "heater", "quarters", "or", "coolingtower", "crane", "flare"]);
-function showLabel(b, type, focus) {
-  if (type === "corridor") return false;
-  if (focus) return focus === type;
-  return KEY_TYPES.has(type) || b.w * b.d >= 120;
-}
 const shortName = n => n.replace(/\s*\(.*?\)\s*/g, " ").replace(/^[A-Z0-9-]+\s+(?=[가-힣])/, "").trim();
 
 function frame(c) {
@@ -402,34 +386,73 @@ function frame(c) {
   for (const v of Object.values(views)) { v.controls.target.set(0, H / 3, 0); v.controls.update(); }
 }
 
+function setHover(id, from) {
+  for (const w of Object.values(views)) {
+    const o = id && w.byId[id];
+    w.hl.visible = w.tag.visible = !!o;
+    if (!o) continue;
+    const b = o.userData.b, h = Math.max(b.h, 1);
+    w.hl.scale.set(b.w + .8, h + .8, b.d + .8);
+    w.hl.position.set(o.position.x, o.position.y + h / 2, o.position.z);
+    const bad = o.userData.why.length && $("c-viol").checked;
+    w.hl.material.color.set(bad ? 0xff2d4a : 0x2357d6);
+    w.tag.element.className = "label" + (bad ? " bad" : "");
+    w.tag.element.textContent = (w === from ? "" : (w === views.opt ? "최적화 후 위치 · " : "원래 위치 · ")) + shortName(b.name);
+    if (w === from) w.tag.visible = false;            // 올린 쪽은 툴팁이 이름을 보여 준다
+    w.tag.position.set(o.position.x, o.position.y + h + 1, o.position.z);
+  }
+  renderAll();
+}
+
+let hoverId = null;
 function bindHover(v) {
   const ray = new THREE.Raycaster(), p = new THREE.Vector2();
+  const hide = () => { v.tip.style.display = "none"; if (hoverId) { hoverId = null; setHover(null); } };
   v.el.addEventListener("pointermove", ev => {
     const r = v.el.getBoundingClientRect();
     p.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
     p.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
     ray.setFromCamera(p, camera);
     const hit = ray.intersectObjects(v.pick, true)[0];
-    if (!hit) { v.tip.style.display = "none"; return; }
-    let o = hit.object; while (o && !o.userData.b) o = o.parent;
-    if (!o) { v.tip.style.display = "none"; return; }
+    let o = hit && hit.object; while (o && !o.userData.b) o = o.parent;
+    if (!o) return hide();
     const { b, why, label, type } = o.userData;
-    v.tip.innerHTML = `<b>${esc(b.name)}</b><br>${esc(TYPES[type][0])} — ${esc(TYPES[type][1])}<br>${esc(label)} · ${b.f + 1}층 · ${b.w.toFixed(1)} × ${b.d.toFixed(1)} × ${b.h.toFixed(1)} m` +
-      (b.pinned ? "<br>고정 — 옮길 수 없음" : "") +
-      (why.length && $("c-viol").checked ? why.map(w => `<div class="r">⚠ ${esc(plain(w))}</div>`).join("") : "");
+    if (hoverId !== b.id) {
+      hoverId = b.id;
+      const c = CASES[current];
+      v.tip.innerHTML =
+        `<div class="th"><img alt="" src="${thumb(type, b, colorMap(c).map[b.group])}"><div>` +
+        `<b>${esc(shortName(b.name))}</b><div class="ty">${esc(TYPES[type][0])}</div></div></div>` +
+        `<div>${esc(TYPES[type][1])}</div>` +
+        `<div class="mt">${esc(label)} · ${b.f + 1}층 · ${b.w.toFixed(1)} × ${b.d.toFixed(1)} × ${b.h.toFixed(1)} m</div>` +
+        (b.pinned ? `<div class="mt">고정 — 옮길 수 없음</div>` : "") +
+        (why.length && $("c-viol").checked ? why.map(w => `<div class="r">⚠ ${esc(plain(w))}</div>`).join("") : "");
+      setHover(b.id, v);
+    }
     v.tip.style.display = "block";
-    const x = Math.min(ev.clientX - r.left + 14, r.width - 290);
+    const tw = v.tip.offsetWidth, th = v.tip.offsetHeight;
+    let x = ev.clientX - r.left + 16, y = ev.clientY - r.top + 16;
+    if (x + tw > r.width - 6) x = ev.clientX - r.left - tw - 16;
+    if (y + th > r.height - 6) y = ev.clientY - r.top - th - 16;
     v.tip.style.left = Math.max(6, x) + "px";
-    v.tip.style.top = Math.max(6, ev.clientY - r.top + 14) + "px";
+    v.tip.style.top = Math.max(6, y) + "px";
   });
-  v.el.addEventListener("pointerleave", () => v.tip.style.display = "none");
+  v.el.addEventListener("pointerleave", hide);
 }
 
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
 // "A↔B: 간극 7.00 m < 요구 18 m (근거: …)" → "A와 B 사이 7.0 m — 18 m 이상 떨어져야 함"
+let idName = {};
+const nm = id => shortName(idName[id] || id);
 function plain(d) {
-  const m = d.match(/^(.+?)↔(.+?): 간극 ([\d.]+) m < 요구 ([\d.]+) m/);
-  if (m) return `${m[1]}와 ${m[2]} 사이가 ${(+m[3]).toFixed(1)} m — ${(+m[4]).toFixed(0)} m 이상 떨어져야 함`;
+  let m = d.match(/^(.+?)↔(.+?): 간극 ([\d.]+) m < 요구 ([\d.]+) m/);
+  if (m) return `${nm(m[1])}와 ${nm(m[2])} 사이가 ${(+m[3]).toFixed(1)} m — ${(+m[4]).toFixed(0)} m 이상 떨어져야 함`;
+  m = d.match(/^(.+?): 외벽 접면 요구인데 외벽에서 ([\d.]+) m/);
+  if (m) return `${nm(m[1])}은(는) 바깥벽에 붙어 있어야 하는데 ${(+m[2]).toFixed(1)} m 안쪽에 있음 (환기·장비 반출입 때문)`;
+  m = d.match(/^(.+?): 크레인 베이를 Δx=([\d.]+) Δy=([\d.]+) m 벗어남/);
+  if (m) return `${nm(m[1])}이(가) 천장 크레인이 닿는 범위를 ${Math.max(+m[2], +m[3]).toFixed(1)} m 벗어남 — 무거운 장비를 들어 옮길 수 없음`;
+  m = d.match(/^하중경로 '(.+?)→(.+?)'/);
+  if (m) return `${nm(m[1])}에서 ${nm(m[2])}(으)로 무거운 짐을 옮기는 길이 A·B 두 안전계열 위를 모두 지남 — 한 번 떨어뜨리면 두 계열이 동시에 망가질 수 있음`;
   if (/^외피/.test(d)) return "건물이 정해진 부지 크기를 넘음";
   return d.replace(/\s*\(근거:.*\)\s*$/, "");
 }
@@ -499,6 +522,7 @@ function show(i) {
   $("t-asis").textContent = `${fmt(a.footprint)} m²`;
   $("t-opt").textContent = `${fmt(o.footprint)} m²`;
   focusType = null;
+  idName = Object.fromEntries(c.asis.blocks.map(b => [b.id, b.name]));
   const colors = colorMap(c);
   build(views.asis, c, a, colors, null);
   build(views.opt, c, o, colors, a);
@@ -526,7 +550,6 @@ $("tabs").innerHTML = CASES.map((c, i) => `<button class="tab" role="tab" data-i
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => { show(+t.dataset.i); frame(CASES[current]); renderAll(); });
 $("c-viol").onchange = () => rebuild(true);
 $("c-model").onchange = () => rebuild(true);
-$("c-label").onchange = () => rebuild(true);
 $("c-ghost").onchange = () => rebuild(true);
 $("c-explode").oninput = e => { explode = +e.target.value; rebuild(true); };
 $("c-reset").onclick = () => { frame(CASES[current]); renderAll(); };
