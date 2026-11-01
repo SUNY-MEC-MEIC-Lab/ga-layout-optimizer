@@ -11,11 +11,11 @@ mcp_server.py — SMR GA 배치최적화 MCP 서버. Python 표준 라이브러�
       python3 server/mcp_server.py --http --port 8765
       → MCP 엔드포인트  http://127.0.0.1:8765/mcp      (Streamable HTTP, JSON 응답)
         브라우저 스튜디오 http://127.0.0.1:8765/studio  (업로드·검증·승인·실행·비교)
-      ChatGPT 웹은 공개 HTTPS 주소가 필요하다 → README 「ChatGPT 웹 연결」(터널) 참조.
+      ChatGPT 웹은 공개 HTTPS 주소가 필요하다 → guide/CONNECT.md (원격 연결·터널) 참조.
 
 ★ 데이터 경계: 엔진은 이 컴퓨터에서 돈다. 그러나 MCP 를 부르는 LLM(Claude/ChatGPT)은
   도구 응답(기기 이름·치수·결과 수치)을 자기 서버로 가져간다. 실제 원전 설계값은
-  공개값·가정치로 바꿔 쓸 것 (README 한계 13항).
+  공개값·가정치로 바꿔 쓸 것 (guide/LIMITATIONS.md 18항).
 """
 from __future__ import annotations
 

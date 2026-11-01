@@ -1,18 +1,22 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "smr-ga",
-  "displayName": "SMR GA Layout Optimizer",
+  "displayName": "GA Layout Optimizer",
   "version": "0.3.0",
-  "description": "SMR General Arrangement 배치 최적화. 자연어 요구사항을 Design Intent IR 로 정형화하고(Gate 1 사람 승인), 결정론적 솔버가 배치를 계산해 SVG/DXF 도면을 만든다. LLM 은 좌표를 한 개도 생성하지 않는다.",
+  "description": "건물·플랜트 배치(General Arrangement) 최적화. 도면(DXF·SVG·PDF·PNG·IFC·CSV)에서 현황 배치를 읽고, 자연어 요구사항을 Design Intent IR 로 정형화해(Gate 1 사람 승인) 결정론적 솔버가 각 공간의 역할을 지키며 더 작은 배치를 계산하고 SVG/DXF 도면을 만든다. LLM 은 좌표를 한 개도 생성하지 않는다. 예제: 석유화학 플랜트·FPSO·병원·원전 보조건물·실제 공개 BIM.",
   "author": {
     "name": "ga-layout-optimizer"
   },
   "license": "Apache-2.0",
   "keywords": [
-    "nuclear",
-    "smr",
-    "general-arrangement",
     "layout-optimization",
+    "general-arrangement",
+    "building-layout",
+    "plant-layout",
+    "floor-plan",
+    "drawing-import",
+    "dxf",
+    "ifc",
     "sequence-pair",
     "nsga-ii",
     "offline"

@@ -1,20 +1,25 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
   "name": "smr-ga-marketplace",
-  "description": "SMR GA 배치최적화 플러그인 (단일 플러그인 마켓플레이스)",
+  "description": "건물·플랜트 배치 최적화 플러그인 (단일 플러그인 마켓플레이스)",
   "owner": {
     "name": "ga-layout-optimizer"
   },
   "plugins": [
     {
       "name": "smr-ga",
-      "displayName": "SMR GA Layout Optimizer",
+      "displayName": "GA Layout Optimizer",
       "source": "./",
-      "description": "SMR General Arrangement 배치 최적화 — IR 정형화 → Gate 1 → 결정론적 솔버 → 도면",
+      "description": "건물·플랜트 배치(General Arrangement) 최적화 — 도면 인식 → IR 정형화 → Gate 1 → 결정론적 솔버 → 현황 대비 비교·도면",
       "version": "0.3.0",
       "license": "Apache-2.0",
       "category": "engineering",
-      "keywords": ["nuclear", "smr", "layout-optimization"]
+      "keywords": [
+        "layout-optimization",
+        "general-arrangement",
+        "building-layout",
+        "plant-layout"
+      ]
     }
   ]
 }

@@ -35,7 +35,7 @@ PUB = os.path.join(ROOT, "..", "bench", "real", "public")
 
 CASES = [
     dict(key="smr_aux", src="example:smr_aux", req="smr_aux.json",
-         title="원전 SMR 보조건물", desc="가상 DXF · 3개 층 · 원전급 제약 + 계단 코어·복도 기능"),
+         title="원전 보조건물", desc="가상 DXF · 3개 층 · 원전급 제약 + 계단 코어·복도 기능"),
     dict(key="chem_plant", src="example:chem_plant", req="chem_plant.json",
          title="석유화학 공정 플랜트", desc="가상 벡터 PDF 1:500 · 화재·폭발 이격 + 배관대 기능"),
     dict(key="fpso_topside", src="example:fpso_topside", req="fpso_topside.json",
